@@ -1,0 +1,9 @@
+docx2txt
+langchain-pinecone
+langchain-text-splitters
+langchain-voyageai
+llama-parse
+openpyxl
+pinecone-client
+PyPDF2
+streamlit
