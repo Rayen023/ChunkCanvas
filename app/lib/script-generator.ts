@@ -6,7 +6,7 @@
  */
 
 import { PIPELINE } from "./constants";
-import type { ChunkingParams, PdfEngine } from "./types";
+import type { ChunkingParams, EmbeddingProvider, PdfEngine } from "./types";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -22,8 +22,14 @@ export interface ScriptConfig {
   // Excel extras
   excelColumn?: string;
   excelSheet?: string;
+  // Embedding provider
+  embeddingProvider?: EmbeddingProvider;
   // Voyage model (for embeddings/pinecone)
   voyageModel?: string;
+  // OpenRouter embedding model
+  openrouterEmbeddingModel?: string;
+  // OpenRouter embedding dimensions
+  openrouterEmbeddingDimensions?: number;
   // Pinecone (for pinecone stage)
   pineconeIndexName?: string;
   pineconeCloud?: string;
@@ -32,7 +38,7 @@ export interface ScriptConfig {
 
 // ─── Dependency Sets ──────────────────────────────────────────────────────
 
-function getDeps(pipeline: string, stage: ScriptStage): string[] {
+function getDeps(pipeline: string, stage: ScriptStage, embeddingProvider?: EmbeddingProvider): string[] {
   const base = [
     '"langchain-text-splitters>=0.2"',
     '"python-dotenv>=1.0"',
@@ -59,7 +65,11 @@ function getDeps(pipeline: string, stage: ScriptStage): string[] {
   }
 
   if (stage === "embeddings" || stage === "pinecone") {
-    base.push('"langchain-voyageai>=0.0.3"');
+    if (embeddingProvider === "openrouter") {
+      base.push('"httpx>=0.27"');
+    } else {
+      base.push('"langchain-voyageai>=0.0.3"');
+    }
   }
   if (stage === "pinecone") {
     base.push('"langchain-pinecone>=0.1.4"', '"pinecone>=5.0"', '"langchain-core>=0.2"');
@@ -321,10 +331,42 @@ if __name__ == "__main__":
 `;
 }
 
-function genMainEmbeddings(voyageModel: string, isExcel: boolean): string {
+function genMainEmbeddings(embeddingProvider: EmbeddingProvider, voyageModel: string, openrouterEmbeddingModel: string, isExcel: boolean, embeddingDimensions?: number): string {
   const chunkCall = isExcel
     ? `    rows = read_document(file_path)\n    chunks = chunk_rows(rows, filename)`
     : `    text = read_document(file_path)\n    chunks = chunk_text(text, filename)`;
+
+  const modelName = embeddingProvider === "openrouter" ? openrouterEmbeddingModel : voyageModel;
+
+  const dimsPayload = embeddingDimensions && embeddingDimensions > 0
+    ? `\n    DIMENSIONS = ${embeddingDimensions}`
+    : "";
+  const dimsJson = embeddingDimensions && embeddingDimensions > 0
+    ? `, "dimensions": DIMENSIONS`
+    : "";
+
+  const embedSection = embeddingProvider === "openrouter"
+    ? `    import httpx
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    model = ${JSON.stringify(openrouterEmbeddingModel)}
+    BATCH_SIZE = 128${dimsPayload}
+    embeddings = []
+    for i in range(0, len(chunks), BATCH_SIZE):
+        batch = chunks[i:i+BATCH_SIZE]
+        resp = httpx.post(
+            "https://openrouter.ai/api/v1/embeddings",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+                     "HTTP-Referer": "https://github.com/chunkcanvas", "X-Title": "ChunkCanvas"},
+            json={"model": model, "input": batch${dimsJson}},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = sorted(resp.json()["data"], key=lambda x: x.get("index", 0))
+        embeddings.extend([d["embedding"] for d in data])
+        print(f"  Batch {i//BATCH_SIZE + 1} done ({len(embeddings)}/{len(chunks)})")`
+    : `    from langchain_voyageai import VoyageAIEmbeddings
+    embedder = VoyageAIEmbeddings(model=${JSON.stringify(voyageModel)})
+    embeddings = embedder.embed_documents(chunks)`;
 
   return `
 import argparse, json, os
@@ -338,14 +380,12 @@ def main():
 
 ${chunkCall}
 
-    from langchain_voyageai import VoyageAIEmbeddings
-    embedder = VoyageAIEmbeddings(model=${JSON.stringify(voyageModel)})
-    embeddings = embedder.embed_documents(chunks)
+${embedSection}
 
     output = {
         "metadata": {
             "source_file": filename,
-            "embedding_model": ${JSON.stringify(voyageModel)},
+            "embedding_model": ${JSON.stringify(modelName)},
             "num_chunks": len(chunks),
             "embedding_dimensions": len(embeddings[0]) if embeddings else 0,
         },
@@ -364,29 +404,70 @@ if __name__ == "__main__":
 }
 
 function genMainPinecone(
+  embeddingProvider: EmbeddingProvider,
   voyageModel: string,
+  openrouterEmbeddingModel: string,
   indexName: string,
   cloud: string,
   region: string,
   isExcel: boolean,
+  embeddingDimensions?: number,
 ): string {
   const chunkCall = isExcel
     ? `    rows = read_document(file_path)\n    chunks = chunk_rows(rows, filename)`
     : `    text = read_document(file_path)\n    chunks = chunk_text(text, filename)`;
 
-  return `
-import argparse, os
+  const dimsPayload = embeddingDimensions && embeddingDimensions > 0
+    ? `\n    DIMENSIONS = ${embeddingDimensions}`
+    : "";
+  const dimsJson = embeddingDimensions && embeddingDimensions > 0
+    ? `, "dimensions": DIMENSIONS`
+    : "";
 
-def main():
-    parser = argparse.ArgumentParser(description="ChunkCanvas pipeline → Pinecone")
-    parser.add_argument("file", help="Path to document")
-    args = parser.parse_args()
-    file_path = args.file
-    filename = os.path.basename(file_path)
+  const embedSection = embeddingProvider === "openrouter"
+    ? `    import httpx
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    emb_model = ${JSON.stringify(openrouterEmbeddingModel)}
+    BATCH_SIZE = 128${dimsPayload}
+    all_embeddings = []
+    for i in range(0, len(chunks), BATCH_SIZE):
+        batch = chunks[i:i+BATCH_SIZE]
+        resp = httpx.post(
+            "https://openrouter.ai/api/v1/embeddings",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+                     "HTTP-Referer": "https://github.com/chunkcanvas", "X-Title": "ChunkCanvas"},
+            json={"model": emb_model, "input": batch${dimsJson}},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = sorted(resp.json()["data"], key=lambda x: x.get("index", 0))
+        all_embeddings.extend([d["embedding"] for d in data])
+        print(f"  Embedding batch {i//BATCH_SIZE + 1} done ({len(all_embeddings)}/{len(chunks)})")
 
-${chunkCall}
+    from langchain_core.documents import Document
+    from langchain_pinecone import PineconeVectorStore
+    from pinecone import Pinecone, ServerlessSpec
 
-    from langchain_voyageai import VoyageAIEmbeddings
+    pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
+
+    index_name = ${JSON.stringify(indexName)}
+    existing = [idx.name for idx in pc.list_indexes()]
+    if index_name not in existing:
+        dim = len(all_embeddings[0]) if all_embeddings else 1024
+        pc.create_index(
+            name=index_name, dimension=dim, metric="cosine",
+            spec=ServerlessSpec(cloud=${JSON.stringify(cloud)}, region=${JSON.stringify(region)})
+        )
+        print(f"Created index: {index_name}")
+
+    # Upsert via Pinecone client directly
+    index = pc.Index(index_name)
+    vectors = [{"id": str(i), "values": e, "metadata": {"text": t, "filename": filename}}
+               for i, (t, e) in enumerate(zip(chunks, all_embeddings))]
+    for i in range(0, len(vectors), 100):
+        index.upsert(vectors=vectors[i:i+100])
+    print(f"Uploaded {len(vectors)} chunks to Pinecone index: {index_name}")`
+    : `    from langchain_voyageai import VoyageAIEmbeddings
     from langchain_core.documents import Document
     from langchain_pinecone import PineconeVectorStore
     from pinecone import Pinecone, ServerlessSpec
@@ -405,7 +486,21 @@ ${chunkCall}
 
     docs = [Document(page_content=t, metadata={"filename": filename}) for t in chunks]
     vectorstore = PineconeVectorStore.from_documents(docs, embedder, index_name=index_name)
-    print(f"Uploaded {len(docs)} chunks to Pinecone index: {index_name}")
+    print(f"Uploaded {len(docs)} chunks to Pinecone index: {index_name}")`;
+
+  return `
+import argparse, os
+
+def main():
+    parser = argparse.ArgumentParser(description="ChunkCanvas pipeline → Pinecone")
+    parser.add_argument("file", help="Path to document")
+    args = parser.parse_args()
+    file_path = args.file
+    filename = os.path.basename(file_path)
+
+${chunkCall}
+
+${embedSection}
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
@@ -437,12 +532,12 @@ pipeline = "pipeline:main"
 
 // ─── .env.example Generator ───────────────────────────────────────────────
 
-function genEnvExample(pipeline: string, stage: ScriptStage): string {
+function genEnvExample(pipeline: string, stage: ScriptStage, embeddingProvider?: EmbeddingProvider): string {
   const lines: string[] = [];
-  if (pipeline.startsWith("OpenRouter")) {
+  if (pipeline.startsWith("OpenRouter") || embeddingProvider === "openrouter") {
     lines.push("OPENROUTER_API_KEY=");
   }
-  if (stage === "embeddings" || stage === "pinecone") {
+  if ((stage === "embeddings" || stage === "pinecone") && embeddingProvider !== "openrouter") {
     lines.push("VOYAGEAI_API_KEY=");
   }
   if (stage === "pinecone") {
@@ -513,21 +608,31 @@ export function generatePipelineScript(
   const chunkFn = genChunkFunction(chunkingParams, isSpreadsheet);
 
   // Build main
+  const embeddingProvider = config.embeddingProvider ?? "voyage";
   let mainFn: string;
   switch (stage) {
     case "chunks":
       mainFn = genMainChunks(isSpreadsheet);
       break;
     case "embeddings":
-      mainFn = genMainEmbeddings(config.voyageModel ?? "voyage-4", isSpreadsheet);
+      mainFn = genMainEmbeddings(
+        embeddingProvider,
+        config.voyageModel ?? "voyage-4",
+        config.openrouterEmbeddingModel ?? "qwen/qwen3-embedding-8b",
+        isSpreadsheet,
+        config.openrouterEmbeddingDimensions,
+      );
       break;
     case "pinecone":
       mainFn = genMainPinecone(
+        embeddingProvider,
         config.voyageModel ?? "voyage-4",
+        config.openrouterEmbeddingModel ?? "qwen/qwen3-embedding-8b",
         config.pineconeIndexName ?? "chunkcanvas",
         config.pineconeCloud ?? "aws",
         config.pineconeRegion ?? "us-east-1",
         isSpreadsheet,
+        config.openrouterEmbeddingDimensions,
       );
       break;
   }
@@ -538,9 +643,9 @@ ${readFn}
 ${chunkFn}
 ${mainFn}`;
 
-  const deps = getDeps(pipeline, stage);
+  const deps = getDeps(pipeline, stage, embeddingProvider);
   const pyproject = genPyproject(deps, stage);
-  const envExample = genEnvExample(pipeline, stage);
+  const envExample = genEnvExample(pipeline, stage, embeddingProvider);
 
   return {
     "pipeline.py": pipelinePy,

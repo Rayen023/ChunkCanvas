@@ -19,7 +19,10 @@ export default function DownloadScriptButton({ stage, label }: Props) {
   const pdfEngine = useAppStore((s) => s.pdfEngine);
   const excelColumn = useAppStore((s) => s.excelColumn);
   const excelSheet = useAppStore((s) => s.excelSheet);
+  const embeddingProvider = useAppStore((s) => s.embeddingProvider);
   const voyageModel = useAppStore((s) => s.voyageModel);
+  const openrouterEmbeddingModel = useAppStore((s) => s.openrouterEmbeddingModel);
+  const openrouterEmbeddingDimensions = useAppStore((s) => s.openrouterEmbeddingDimensions);
   const pineconeIndexName = useAppStore((s) => s.pineconeIndexName);
   const pineconeEnvKey = useAppStore((s) => s.pineconeEnvKey);
   const editedChunks = useAppStore((s) => s.editedChunks);
@@ -47,7 +50,10 @@ export default function DownloadScriptButton({ stage, label }: Props) {
         pdfEngine,
         excelColumn: isSpreadsheet ? excelColumn : undefined,
         excelSheet: isSpreadsheet ? excelSheet : undefined,
+        embeddingProvider,
         voyageModel,
+        openrouterEmbeddingModel,
+        openrouterEmbeddingDimensions,
         pineconeIndexName,
         pineconeCloud: env?.cloud,
         pineconeRegion: env?.region,
@@ -61,7 +67,8 @@ export default function DownloadScriptButton({ stage, label }: Props) {
     }
   }, [
     pipeline, chunkingParams, parsedFilename, openrouterModel,
-    openrouterPrompt, pdfEngine, excelColumn, excelSheet, voyageModel,
+    openrouterPrompt, pdfEngine, excelColumn, excelSheet,
+    embeddingProvider, voyageModel, openrouterEmbeddingModel, openrouterEmbeddingDimensions,
     pineconeIndexName, pineconeEnvKey, stage,
   ]);
 

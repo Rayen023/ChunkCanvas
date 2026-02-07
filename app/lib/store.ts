@@ -2,7 +2,7 @@
  * Central Zustand store — single source of truth for the entire app.
  */
 import { create } from "zustand";
-import type { ChunkingParams, PdfEngine } from "./types";
+import type { ChunkingParams, EmbeddingProvider, PdfEngine } from "./types";
 import { DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP, DEFAULT_SEPARATORS } from "./constants";
 
 export interface AppState {
@@ -40,8 +40,11 @@ export interface AppState {
   isChunking: boolean;
 
   // ── Step 6 — embeddings ───────────────────────
+  embeddingProvider: EmbeddingProvider;
   voyageApiKey: string;
   voyageModel: string;
+  openrouterEmbeddingModel: string;
+  openrouterEmbeddingDimensions: number;
   embeddingsData: number[][] | null;
   isEmbedding: boolean;
   embeddingError: string | null;
@@ -107,8 +110,11 @@ export interface AppActions {
   setIsChunking: (v: boolean) => void;
 
   // Step 6
+  setEmbeddingProvider: (provider: EmbeddingProvider) => void;
   setVoyageApiKey: (key: string) => void;
   setVoyageModel: (model: string) => void;
+  setOpenrouterEmbeddingModel: (model: string) => void;
+  setOpenrouterEmbeddingDimensions: (dims: number) => void;
   setEmbeddingsData: (data: number[][] | null) => void;
   setIsEmbedding: (v: boolean) => void;
   setEmbeddingError: (err: string | null) => void;
@@ -172,8 +178,11 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   },
   editedChunks: [],
   isChunking: false,
+  embeddingProvider: "openrouter",
   voyageApiKey: "",
   voyageModel: "voyage-4",
+  openrouterEmbeddingModel: "qwen/qwen3-embedding-8b",
+  openrouterEmbeddingDimensions: 1024,
   embeddingsData: null,
   isEmbedding: false,
   embeddingError: null,
@@ -250,8 +259,11 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
     })),
   setIsChunking: (v) => set({ isChunking: v }),
 
+  setEmbeddingProvider: (provider) => set({ embeddingProvider: provider, embeddingsData: null, embeddingError: null }),
   setVoyageApiKey: (key) => set({ voyageApiKey: key }),
   setVoyageModel: (model) => set({ voyageModel: model }),
+  setOpenrouterEmbeddingModel: (model) => set({ openrouterEmbeddingModel: model }),
+  setOpenrouterEmbeddingDimensions: (dims) => set({ openrouterEmbeddingDimensions: dims }),
   setEmbeddingsData: (data) => set({ embeddingsData: data }),
   setIsEmbedding: (v) => set({ isEmbedding: v }),
   setEmbeddingError: (err) => set({ embeddingError: err }),
@@ -312,8 +324,11 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
       },
       editedChunks: [],
       isChunking: false,
+      embeddingProvider: "openrouter",
       voyageApiKey: s.envKeys.voyage || "",
       voyageModel: "voyage-4",
+      openrouterEmbeddingModel: "qwen/qwen3-embedding-8b",
+      openrouterEmbeddingDimensions: 1024,
       embeddingsData: null,
       isEmbedding: false,
       embeddingError: null,

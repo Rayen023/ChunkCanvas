@@ -32,8 +32,8 @@ const DownloadJsonButton = dynamic(
 const DownloadScriptButton = dynamic(
   () => import("./components/downloads/DownloadScriptButton"),
 );
-const VoyageSection = dynamic(
-  () => import("./components/embeddings/VoyageSection"),
+const EmbeddingsSection = dynamic(
+  () => import("./components/embeddings/EmbeddingsSection"),
 );
 const PineconeSection = dynamic(
   () => import("./components/pinecone/PineconeSection"),
@@ -372,10 +372,10 @@ export default function Home() {
         </section>
       )}
 
-      {/* ═══════ STEP 5 — Voyage AI Embeddings ═══════ */}
+      {/* ═══════ STEP 5 — Embeddings ═══════ */}
       {editedChunks.length > 0 && (
         <section id="step-5">
-          <VoyageSection />
+          <EmbeddingsSection />
         </section>
       )}
 

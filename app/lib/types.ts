@@ -31,6 +31,20 @@ export interface OpenRouterModel {
   input_modalities: string[];
 }
 
+/** Extended model info with pricing & context window */
+export interface OpenRouterModelFull extends OpenRouterModel {
+  output_modalities: string[];
+  context_length: number;
+  pricing: {
+    prompt: string;    // cost per token (string decimal)
+    completion: string;
+  };
+}
+
+// ─── Embedding Provider ──────────────────────────────────────────────────
+
+export type EmbeddingProvider = "voyage" | "openrouter";
+
 // ─── PDF Engine ───────────────────────────────────────────────────────────
 
 export type PdfEngine = "native" | "pdf-text" | "mistral-ocr";

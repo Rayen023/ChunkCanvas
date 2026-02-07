@@ -10,7 +10,7 @@ import {
   OPENROUTER_TIMEOUT_MS,
   FALLBACK_MODELS,
 } from "./constants";
-import type { Modality, OpenRouterModel, PdfEngine, ProgressCallback } from "./types";
+import type { Modality, OpenRouterModel, OpenRouterModelFull, PdfEngine, ProgressCallback } from "./types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -116,7 +116,36 @@ async function callOpenRouter(
 // ─── Fetch & Filter Models ────────────────────────────────────────────────
 
 let _modelsCache: { data: OpenRouterModel[]; ts: number } | null = null;
+let _modelsFullCache: { data: OpenRouterModelFull[]; ts: number } | null = null;
+let _embeddingModelsCache: { data: OpenRouterModelFull[]; ts: number } | null = null;
 const CACHE_TTL = 600_000; // 10 minutes
+
+/** Parse raw model data from OpenRouter API into full model objects */
+function parseModelData(rawModels: Record<string, unknown>[]): OpenRouterModelFull[] {
+  return rawModels
+    .filter((m) => m.id && m.architecture)
+    .map((m: Record<string, unknown>) => {
+      const arch = m.architecture as {
+        input_modalities?: string[];
+        output_modalities?: string[];
+      };
+      const pricing = m.pricing as {
+        prompt?: string;
+        completion?: string;
+      } | undefined;
+      return {
+        id: (m.id as string),
+        name: (m.name as string) ?? (m.id as string),
+        input_modalities: arch?.input_modalities ?? ["text"],
+        output_modalities: arch?.output_modalities ?? ["text"],
+        context_length: (m.context_length as number) ?? 0,
+        pricing: {
+          prompt: pricing?.prompt ?? "0",
+          completion: pricing?.completion ?? "0",
+        },
+      };
+    });
+}
 
 export async function fetchAvailableModels(
   apiKey: string,
@@ -158,6 +187,142 @@ export async function fetchAvailableModels(
   }
 }
 
+/** Fetch all models with full metadata (pricing, context_length, output_modalities) */
+export async function fetchAvailableModelsFull(
+  apiKey: string,
+): Promise<OpenRouterModelFull[]> {
+  if (_modelsFullCache && Date.now() - _modelsFullCache.ts < CACHE_TTL) {
+    return _modelsFullCache.data;
+  }
+
+  try {
+    const res = await fetch(`${OPENROUTER_API_URL}/models`, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+    });
+
+    if (!res.ok) throw new Error(`${res.status}`);
+    const json = await res.json();
+    const models = parseModelData(json.data ?? []);
+    _modelsFullCache = { data: models, ts: Date.now() };
+
+    // Also populate the basic cache
+    _modelsCache = {
+      data: models.map((m) => ({
+        id: m.id,
+        name: m.name,
+        input_modalities: m.input_modalities,
+      })),
+      ts: Date.now(),
+    };
+
+    return models;
+  } catch {
+    const { FALLBACK_EMBEDDING_MODELS } = await import("./constants");
+    return [...Object.values(FALLBACK_MODELS).map((m) => ({
+      ...m,
+      output_modalities: ["text"],
+      context_length: 0,
+      pricing: { prompt: "0", completion: "0" },
+    })), ...FALLBACK_EMBEDDING_MODELS];
+  }
+}
+
+/** Get embedding-only models (output_modalities includes "embeddings") */
+export function getEmbeddingModels(
+  models: OpenRouterModelFull[],
+): OpenRouterModelFull[] {
+  return models.filter((m) =>
+    m.output_modalities.includes("embeddings"),
+  );
+}
+
+/**
+ * Fetch embedding models directly from the dedicated /embeddings/models endpoint.
+ * Falls back to filtering from the general /models endpoint, then to hardcoded fallbacks.
+ */
+export async function fetchEmbeddingModelsDirect(
+  apiKey: string,
+): Promise<OpenRouterModelFull[]> {
+  if (_embeddingModelsCache && Date.now() - _embeddingModelsCache.ts < CACHE_TTL) {
+    return _embeddingModelsCache.data;
+  }
+
+  try {
+    const res = await fetch(`${OPENROUTER_API_URL}/embeddings/models`, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+    });
+
+    if (!res.ok) throw new Error(`${res.status}`);
+    const json = await res.json();
+    const models = parseModelData(json.data ?? []);
+
+    if (models.length > 0) {
+      _embeddingModelsCache = { data: models, ts: Date.now() };
+      return models;
+    }
+    // If endpoint returned empty, fall through to general models
+  } catch {
+    // Fall through to general models filtering
+  }
+
+  // Fallback: fetch all models and filter
+  try {
+    const allModels = await fetchAvailableModelsFull(apiKey);
+    const embModels = getEmbeddingModels(allModels);
+    if (embModels.length > 0) {
+      _embeddingModelsCache = { data: embModels, ts: Date.now() };
+      return embModels;
+    }
+  } catch {
+    // Fall through to hardcoded
+  }
+
+  const { FALLBACK_EMBEDDING_MODELS } = await import("./constants");
+  return FALLBACK_EMBEDDING_MODELS;
+}
+
+/** Get models for a given input modality with full metadata */
+export function getModelsForModalityFull(
+  models: OpenRouterModelFull[],
+  modality: Modality,
+): OpenRouterModelFull[] {
+  const filtered = models.filter(
+    (m) =>
+      m.input_modalities.includes(modality) &&
+      !m.output_modalities.includes("embeddings"),
+  );
+  filtered.sort((a, b) => {
+    if (a.id === OPENROUTER_DEFAULT_MODEL) return -1;
+    if (b.id === OPENROUTER_DEFAULT_MODEL) return 1;
+    return a.name.localeCompare(b.name);
+  });
+  return filtered;
+}
+
+/** Format pricing for display: convert per-token price to $/M tokens */
+export function formatPricing(pricePerToken: string): string {
+  const val = parseFloat(pricePerToken);
+  if (isNaN(val) || val === 0) return "Free";
+  const perMillion = val * 1_000_000;
+  if (perMillion < 0.01) return `$${perMillion.toFixed(4)}/M`;
+  if (perMillion < 1) return `$${perMillion.toFixed(3)}/M`;
+  return `$${perMillion.toFixed(2)}/M`;
+}
+
+/** Format context length for display */
+export function formatContextLength(ctx: number): string {
+  if (!ctx || ctx === 0) return "?";
+  if (ctx >= 1_000_000) return `${(ctx / 1_000_000).toFixed(1)}M`;
+  if (ctx >= 1_000) return `${Math.round(ctx / 1_000)}k`;
+  return String(ctx);
+}
+
 export function getModelsForModality(
   models: OpenRouterModel[],
   modality: Modality,
@@ -174,6 +339,85 @@ export function getModelsForModality(
   });
 
   return filtered;
+}
+
+// ─── OpenRouter Embeddings ────────────────────────────────────────────────
+
+/**
+ * Generate embeddings using the OpenRouter /embeddings endpoint.
+ * Processes texts in batches to avoid payload limits.
+ * @param dimensions - Optional output dimensions (e.g. 1024). Omit to use model's default.
+ */
+export async function generateOpenRouterEmbeddings(
+  apiKey: string,
+  model: string,
+  texts: string[],
+  batchSize?: number,
+  dimensions?: number,
+): Promise<number[][]> {
+  const { OPENROUTER_EMBEDDING_BATCH_SIZE } = await import("./constants");
+  const size = batchSize ?? OPENROUTER_EMBEDDING_BATCH_SIZE;
+  const allEmbeddings: number[][] = [];
+
+  for (let i = 0; i < texts.length; i += size) {
+    const batch = texts.slice(i, i + size);
+
+    let lastError: Error | null = null;
+    let success = false;
+
+    for (let attempt = 0; attempt < OPENROUTER_MAX_RETRIES; attempt++) {
+      try {
+        const payload: Record<string, unknown> = { model, input: batch };
+        if (dimensions && dimensions > 0) {
+          payload.dimensions = dimensions;
+        }
+
+        const res = await fetch(`${OPENROUTER_API_URL}/embeddings`, {
+          method: "POST",
+          headers: {
+            ...OPENROUTER_HEADERS_BASE,
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.status === 429 || res.status >= 500) {
+          lastError = new Error(`HTTP ${res.status}: ${res.statusText}`);
+          await sleep(OPENROUTER_RETRY_DELAY_MS * 2 ** attempt);
+          continue;
+        }
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => res.statusText);
+          throw new Error(`OpenRouter Embeddings ${res.status}: ${errText}`);
+        }
+
+        const json = await res.json();
+        if (json.error) {
+          throw new Error(`OpenRouter API error: ${JSON.stringify(json.error)}`);
+        }
+
+        const batchEmbeddings = (json.data as { embedding: number[]; index?: number }[])
+          .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+          .map((d) => d.embedding);
+
+        allEmbeddings.push(...batchEmbeddings);
+        success = true;
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (attempt < OPENROUTER_MAX_RETRIES - 1) {
+          await sleep(OPENROUTER_RETRY_DELAY_MS * 2 ** attempt);
+        }
+      }
+    }
+
+    if (!success) {
+      throw lastError ?? new Error("OpenRouter embeddings request failed after retries");
+    }
+  }
+
+  return allEmbeddings;
 }
 
 // ─── PDF Page-by-Page Processing ──────────────────────────────────────────

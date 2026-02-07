@@ -4,6 +4,7 @@ import {
   type VoyageModel,
   type PineconeEnvironment,
   type OpenRouterModel,
+  type OpenRouterModelFull,
 } from "./types";
 
 // Re-export PIPELINE for convenience
@@ -158,6 +159,67 @@ export const VIDEO_MIME: Record<string, string> = {
   mkv: "video/x-matroska",
   avi: "video/x-msvideo",
 };
+
+// ─── OpenRouter Embeddings ──────────────────────────────────────────────
+
+export const OPENROUTER_DEFAULT_EMBEDDING_MODEL = "qwen/qwen3-embedding-8b";
+export const OPENROUTER_EMBEDDING_BATCH_SIZE = 128;
+export const OPENROUTER_DEFAULT_EMBEDDING_DIMENSIONS = 1024;
+
+/**
+ * Known default embedding dimensions per model.
+ * The OpenRouter API does not return this metadata, so we maintain a static map.
+ * Models that support the `dimensions` parameter can output different sizes —
+ * these are just the defaults.
+ */
+export const KNOWN_EMBEDDING_DIMENSIONS: Record<string, number> = {
+  "qwen/qwen3-embedding-8b": 4096,
+  "qwen/qwen3-embedding-0.6b": 1024,
+  "openai/text-embedding-3-small": 1536,
+  "openai/text-embedding-3-large": 3072,
+  "openai/text-embedding-ada-002": 1536,
+  "google/text-embedding-004": 768,
+  "cohere/embed-english-v3.0": 1024,
+  "cohere/embed-multilingual-v3.0": 1024,
+  "cohere/embed-english-light-v3.0": 384,
+  "cohere/embed-multilingual-light-v3.0": 384,
+  "mistralai/mistral-embed": 1024,
+};
+
+export const FALLBACK_EMBEDDING_MODELS: OpenRouterModelFull[] = [
+  {
+    id: "qwen/qwen3-embedding-8b",
+    name: "Qwen3 Embedding 8B",
+    input_modalities: ["text"],
+    output_modalities: ["embeddings"],
+    context_length: 32768,
+    pricing: { prompt: "0.00000002", completion: "0" },
+  },
+  {
+    id: "qwen/qwen3-embedding-0.6b",
+    name: "Qwen3 Embedding 0.6B",
+    input_modalities: ["text"],
+    output_modalities: ["embeddings"],
+    context_length: 32768,
+    pricing: { prompt: "0.00000002", completion: "0" },
+  },
+  {
+    id: "openai/text-embedding-3-small",
+    name: "Text Embedding 3 Small",
+    input_modalities: ["text"],
+    output_modalities: ["embeddings"],
+    context_length: 8191,
+    pricing: { prompt: "0.00000002", completion: "0" },
+  },
+  {
+    id: "openai/text-embedding-3-large",
+    name: "Text Embedding 3 Large",
+    input_modalities: ["text"],
+    output_modalities: ["embeddings"],
+    context_length: 8191,
+    pricing: { prompt: "0.00000013", completion: "0" },
+  },
+];
 
 // ─── Voyage AI ────────────────────────────────────────────────────────────
 

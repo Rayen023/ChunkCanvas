@@ -35,9 +35,9 @@ const STEPS = [
   },
   {
     num: 5,
-    title: "Voyage AI Embeddings",
-    short: "Generate vector embeddings with Voyage AI.",
-    detail: "Chunks are batched (128 at a time) and sent to the Voyage AI REST API. Results can be downloaded as JSON.",
+    title: "Embeddings",
+    short: "Generate vector embeddings with OpenRouter or Voyage AI.",
+    detail: "Chunks are batched and sent to your chosen embedding provider. Results can be downloaded as JSON.",
     badge: "API Key",
   },
   {

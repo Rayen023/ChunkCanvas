@@ -9,7 +9,25 @@ import {
   FALLBACK_MODELS,
 } from "@/app/lib/constants";
 import { PIPELINE_MODALITY } from "@/app/lib/types";
-import type { OpenRouterModel, Modality } from "@/app/lib/types";
+import type { OpenRouterModelFull, Modality } from "@/app/lib/types";
+
+/** Format pricing for display: convert per-token price to $/M tokens */
+function formatPricing(pricePerToken: string): string {
+  const val = parseFloat(pricePerToken);
+  if (isNaN(val) || val === 0) return "Free";
+  const perMillion = val * 1_000_000;
+  if (perMillion < 0.01) return `$${perMillion.toFixed(4)}/M`;
+  if (perMillion < 1) return `$${perMillion.toFixed(3)}/M`;
+  return `$${perMillion.toFixed(2)}/M`;
+}
+
+/** Format context length for display */
+function formatCtx(ctx: number): string {
+  if (!ctx || ctx === 0) return "?";
+  if (ctx >= 1_000_000) return `${(ctx / 1_000_000).toFixed(1)}M`;
+  if (ctx >= 1_000) return `${Math.round(ctx / 1_000)}k`;
+  return String(ctx);
+}
 
 export default function OpenRouterForm() {
   const pipeline = useAppStore((s) => s.pipeline);
@@ -37,22 +55,33 @@ export default function OpenRouterForm() {
     setPrompt(DEFAULT_PROMPTS[modality] ?? "");
   }, [modality, setPrompt]);
 
-  // ── Models fetch ──────────────────────────────────────────
-  const [allModels, setAllModels] = useState<OpenRouterModel[]>([]);
+  // ── Models fetch (full metadata) ──────────────────────────
+  const [allModels, setAllModels] = useState<OpenRouterModelFull[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
 
   const fetchModels = useCallback(async () => {
     if (!apiKey) {
-      setAllModels(Object.values(FALLBACK_MODELS));
+      // Convert fallback to full format
+      setAllModels(Object.values(FALLBACK_MODELS).map((m) => ({
+        ...m,
+        output_modalities: ["text"],
+        context_length: 0,
+        pricing: { prompt: "0", completion: "0" },
+      })));
       return;
     }
     setLoadingModels(true);
     try {
-      const { fetchAvailableModels } = await import("@/app/lib/openrouter");
-      const models = await fetchAvailableModels(apiKey);
+      const { fetchAvailableModelsFull } = await import("@/app/lib/openrouter");
+      const models = await fetchAvailableModelsFull(apiKey);
       setAllModels(models);
     } catch {
-      setAllModels(Object.values(FALLBACK_MODELS));
+      setAllModels(Object.values(FALLBACK_MODELS).map((m) => ({
+        ...m,
+        output_modalities: ["text"],
+        context_length: 0,
+        pricing: { prompt: "0", completion: "0" },
+      })));
     } finally {
       setLoadingModels(false);
     }
@@ -63,8 +92,10 @@ export default function OpenRouterForm() {
   }, [fetchModels]);
 
   const filteredModels = useMemo(() => {
-    const filtered = allModels.filter((m) =>
-      m.input_modalities.includes(modality),
+    const filtered = allModels.filter(
+      (m) =>
+        m.input_modalities.includes(modality) &&
+        !m.output_modalities.includes("embeddings"),
     );
     filtered.sort((a, b) => {
       if (a.id === OPENROUTER_DEFAULT_MODEL) return -1;
@@ -76,7 +107,7 @@ export default function OpenRouterForm() {
 
   // Ensure selected model is valid
   useEffect(() => {
-    if (filteredModels.length && !filteredModels.find((m) => m.id === model)) {
+    if (filteredModels.length && !filteredModels.find((m: OpenRouterModelFull) => m.id === model)) {
       setModel(filteredModels[0].id);
     }
   }, [filteredModels, model, setModel]);
@@ -117,11 +148,16 @@ export default function OpenRouterForm() {
           onChange={(e) => setModel(e.target.value)}
           className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none"
         >
-          {filteredModels.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name} ({m.id})
-            </option>
-          ))}
+          {filteredModels.map((m: OpenRouterModelFull) => {
+            const inPrice = formatPricing(m.pricing.prompt);
+            const outPrice = formatPricing(m.pricing.completion);
+            const ctx = formatCtx(m.context_length);
+            return (
+              <option key={m.id} value={m.id}>
+                {m.name} ({m.id}) — In: {inPrice} · Out: {outPrice} · {ctx} ctx
+              </option>
+            );
+          })}
         </select>
       </div>
 
