@@ -168,7 +168,7 @@ export default function PineconeSection() {
   }, [
     pineconeApiKey, voyageApiKey, voyageModel, pineconeIndexName,
     editedChunks, parsedFilename, setIsUploading, setPineconeError,
-    setPineconeSuccess, resetDownstream, hasEmbeddings, embeddingsData
+    setPineconeSuccess, resetDownstream, hasEmbeddings, embeddingsData, pineconeNamespace
   ]);
 
   if (editedChunks.length === 0) return null;
@@ -467,7 +467,7 @@ export default function PineconeSection() {
                       className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none font-mono"
                     />
                     <p className="text-[10px] text-silver-dark mt-1">
-                      Data will be uploaded to this namespace. If it doesn't exist, it will be created implicitly.
+                      Data will be uploaded to this namespace. If it doesn&apos;t exist, it will be created implicitly.
                     </p>
                   </div>
                 )}

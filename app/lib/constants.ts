@@ -14,6 +14,7 @@ export { PIPELINE };
 export const PIPELINE_ALLOWED_EXTENSIONS: Record<string, Set<string>> = {
   [PIPELINE.SIMPLE_TEXT]: new Set(["pdf", "docx", "txt", "md"]),
   [PIPELINE.EXCEL_SPREADSHEET]: new Set(["xlsx", "xls"]),
+  [PIPELINE.CSV_SPREADSHEET]: new Set(["csv"]),
   [PIPELINE.OPENROUTER_PDF]: new Set(["pdf"]),
   [PIPELINE.OPENROUTER_IMAGE]: new Set([
     "png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif",

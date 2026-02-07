@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, memo } from "react";
+import { useState, useCallback, memo } from "react";
 
 interface Props {
   index: number;
@@ -14,13 +14,15 @@ function ChunkCard({ index, text, onUpdate, onDelete, forceCollapsed }: Props) {
   const [localExpanded, setLocalExpanded] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
   const [prevText, setPrevText] = useState(text);
+  const [prevForceCollapsed, setPrevForceCollapsed] = useState(forceCollapsed);
 
   // Sync local expanded state when the global toggle changes
-  useEffect(() => {
+  if (forceCollapsed !== prevForceCollapsed) {
+    setPrevForceCollapsed(forceCollapsed);
     if (forceCollapsed !== undefined) {
       setLocalExpanded(!forceCollapsed);
     }
-  }, [forceCollapsed]);
+  }
 
   const expanded = localExpanded;
 

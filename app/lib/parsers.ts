@@ -43,12 +43,21 @@ async function parsePlainText(file: File): Promise<string> {
 
 // ─── Excel Pipeline Parser ────────────────────────────────────────────────
 
-export async function getExcelColumns(file: File): Promise<string[]> {
+export async function getExcelSheets(file: File): Promise<string[]> {
   const XLSX = await import("xlsx");
   const arrayBuffer = await file.arrayBuffer();
   const workbook = XLSX.read(arrayBuffer, { type: "array" });
-  const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-  const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, {
+  return workbook.SheetNames;
+}
+
+export async function getExcelColumns(file: File, sheetName?: string): Promise<string[]> {
+  const XLSX = await import("xlsx");
+  const arrayBuffer = await file.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const sheet = sheetName ? workbook.Sheets[sheetName] : workbook.Sheets[workbook.SheetNames[0]];
+  if (!sheet) return [];
+  
+  const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     header: 1,
   });
   if (data.length === 0) return [];
@@ -58,12 +67,15 @@ export async function getExcelColumns(file: File): Promise<string[]> {
 export async function parseExcel(
   file: File,
   columnName: string,
+  sheetName?: string,
 ): Promise<{ text: string; rows: string[] }> {
   const XLSX = await import("xlsx");
   const arrayBuffer = await file.arrayBuffer();
   const workbook = XLSX.read(arrayBuffer, { type: "array" });
-  const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-  const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet);
+  const sheet = sheetName ? workbook.Sheets[sheetName] : workbook.Sheets[workbook.SheetNames[0]];
+  if (!sheet) throw new Error(`Sheet "${sheetName}" not found`);
+
+  const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
 
   const rows = data
     .map((row) => String(row[columnName] ?? ""))
@@ -84,6 +96,7 @@ export interface ParseOptions {
   pdfEngine?: PdfEngine;
   // Excel-specific
   excelColumn?: string;
+  excelSheet?: string;
   // Progress & cancellation
   onProgress?: ProgressCallback;
   signal?: AbortSignal;
@@ -107,10 +120,11 @@ export async function parseDocument(opts: ParseOptions): Promise<ParseResult> {
       return { content };
     }
 
-    // ── Excel ────────────────────────────────────────────────────
-    case PIPELINE.EXCEL_SPREADSHEET: {
-      if (!opts.excelColumn) throw new Error("Excel column must be specified");
-      const { text, rows } = await parseExcel(opts.file, opts.excelColumn);
+    // ── Excel & CSV ──────────────────────────────────────────────
+    case PIPELINE.EXCEL_SPREADSHEET:
+    case PIPELINE.CSV_SPREADSHEET: {
+      if (!opts.excelColumn) throw new Error("Column must be specified");
+      const { text, rows } = await parseExcel(opts.file, opts.excelColumn, opts.excelSheet);
       return { content: text, excelRows: rows };
     }
 

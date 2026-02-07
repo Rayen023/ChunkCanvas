@@ -145,6 +145,7 @@ export default function Home() {
         openrouterPrompt: state.openrouterPrompt,
         pdfEngine: state.pdfEngine,
         excelColumn: state.excelColumn,
+        excelSheet: state.excelSheet,
         onProgress: (pct, msg) => state.setParseProgress(pct, msg),
         signal: controller.signal,
       });
@@ -175,7 +176,8 @@ export default function Home() {
 
       let chunks: string[];
       if (
-        state.pipeline === PIPELINE.EXCEL_SPREADSHEET &&
+        (state.pipeline === PIPELINE.EXCEL_SPREADSHEET ||
+          state.pipeline === PIPELINE.CSV_SPREADSHEET) &&
         state.parsedExcelRows
       ) {
         chunks = await chunkExcelRows(
@@ -236,7 +238,8 @@ export default function Home() {
 
           {/* Pipeline-specific form */}
           {isOpenRouter && <OpenRouterForm />}
-          {pipeline === PIPELINE.EXCEL_SPREADSHEET && <ExcelForm />}
+          {(pipeline === PIPELINE.EXCEL_SPREADSHEET ||
+            pipeline === PIPELINE.CSV_SPREADSHEET) && <ExcelForm />}
           {pipeline === PIPELINE.SIMPLE_TEXT && (
             <p className="text-sm text-silver-dark">
               No configuration needed for Simple Text extraction.

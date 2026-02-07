@@ -21,6 +21,7 @@ export interface ScriptConfig {
   pdfEngine?: PdfEngine;
   // Excel extras
   excelColumn?: string;
+  excelSheet?: string;
   // Voyage model (for embeddings/pinecone)
   voyageModel?: string;
   // Pinecone (for pinecone stage)
@@ -43,6 +44,9 @@ function getDeps(pipeline: string, stage: ScriptStage): string[] {
       break;
     case PIPELINE.EXCEL_SPREADSHEET:
       base.push('"openpyxl>=3.1"', '"pandas>=2.0"');
+      break;
+    case PIPELINE.CSV_SPREADSHEET:
+      base.push('"pandas>=2.0"');
       break;
     case PIPELINE.OPENROUTER_PDF:
       base.push('"httpx>=0.27"', '"PyPDF2>=3.0"');
@@ -85,12 +89,26 @@ def read_document(file_path: str) -> str:
 `;
 }
 
-function genReadExcel(column: string): string {
+function genReadExcel(column: string, sheet: string): string {
+  const sheetArg = sheet ? `, sheet_name=${JSON.stringify(sheet)}` : "";
   return `
 import pandas as pd
 
 def read_document(file_path: str) -> list[str]:
-    df = pd.read_excel(file_path, engine="openpyxl")
+    df = pd.read_excel(file_path, engine="openpyxl"${sheetArg})
+    column = ${JSON.stringify(column)}
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found. Available: {list(df.columns)}")
+    return [str(v) for v in df[column].dropna().tolist()]
+`;
+}
+
+function genReadCsv(column: string): string {
+  return `
+import pandas as pd
+
+def read_document(file_path: str) -> list[str]:
+    df = pd.read_csv(file_path)
     column = ${JSON.stringify(column)}
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found. Available: {list(df.columns)}")
@@ -446,7 +464,9 @@ export function generatePipelineScript(
   config: ScriptConfig,
 ): GeneratedScript {
   const { pipeline, chunkingParams } = config;
-  const isExcel = pipeline === PIPELINE.EXCEL_SPREADSHEET;
+  const isSpreadsheet =
+    pipeline === PIPELINE.EXCEL_SPREADSHEET ||
+    pipeline === PIPELINE.CSV_SPREADSHEET;
 
   // Build read function
   let readFn: string;
@@ -455,7 +475,10 @@ export function generatePipelineScript(
       readFn = genReadSimpleText();
       break;
     case PIPELINE.EXCEL_SPREADSHEET:
-      readFn = genReadExcel(config.excelColumn ?? "");
+      readFn = genReadExcel(config.excelColumn ?? "", config.excelSheet ?? "");
+      break;
+    case PIPELINE.CSV_SPREADSHEET:
+      readFn = genReadCsv(config.excelColumn ?? "");
       break;
     case PIPELINE.OPENROUTER_PDF:
       readFn = genReadOpenRouterPdf(
@@ -487,16 +510,16 @@ export function generatePipelineScript(
   }
 
   // Build chunk function
-  const chunkFn = genChunkFunction(chunkingParams, isExcel);
+  const chunkFn = genChunkFunction(chunkingParams, isSpreadsheet);
 
   // Build main
   let mainFn: string;
   switch (stage) {
     case "chunks":
-      mainFn = genMainChunks(isExcel);
+      mainFn = genMainChunks(isSpreadsheet);
       break;
     case "embeddings":
-      mainFn = genMainEmbeddings(config.voyageModel ?? "voyage-4", isExcel);
+      mainFn = genMainEmbeddings(config.voyageModel ?? "voyage-4", isSpreadsheet);
       break;
     case "pinecone":
       mainFn = genMainPinecone(
@@ -504,7 +527,7 @@ export function generatePipelineScript(
         config.pineconeIndexName ?? "chunkcanvas",
         config.pineconeCloud ?? "aws",
         config.pineconeRegion ?? "us-east-1",
-        isExcel,
+        isSpreadsheet,
       );
       break;
   }

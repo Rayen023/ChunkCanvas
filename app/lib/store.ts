@@ -15,6 +15,8 @@ export interface AppState {
   openrouterModel: string;
   openrouterPrompt: string;
   pdfEngine: PdfEngine;
+  excelSheet: string;
+  excelSheets: string[];
   excelColumn: string;
   excelColumns: string[];
 
@@ -81,6 +83,8 @@ export interface AppActions {
   setOpenrouterModel: (model: string) => void;
   setOpenrouterPrompt: (prompt: string) => void;
   setPdfEngine: (engine: PdfEngine) => void;
+  setExcelSheet: (sheet: string) => void;
+  setExcelSheets: (sheets: string[]) => void;
   setExcelColumn: (col: string) => void;
   setExcelColumns: (cols: string[]) => void;
 
@@ -149,6 +153,8 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   openrouterModel: "google/gemini-3-flash-preview",
   openrouterPrompt: "",
   pdfEngine: "native",
+  excelSheet: "",
+  excelSheets: [],
   excelColumn: "",
   excelColumns: [],
   parsedContent: null,
@@ -200,6 +206,8 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   setOpenrouterModel: (model) => set({ openrouterModel: model }),
   setOpenrouterPrompt: (prompt) => set({ openrouterPrompt: prompt }),
   setPdfEngine: (engine) => set({ pdfEngine: engine }),
+  setExcelSheet: (sheet) => set({ excelSheet: sheet }),
+  setExcelSheets: (sheets) => set({ excelSheets: sheets }),
   setExcelColumn: (col) => set({ excelColumn: col }),
   setExcelColumns: (cols) => set({ excelColumns: cols }),
 
@@ -285,6 +293,8 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
       openrouterModel: "google/gemini-3-flash-preview",
       openrouterPrompt: "",
       pdfEngine: "native",
+      excelSheet: "",
+      excelSheets: [],
       excelColumn: "",
       excelColumns: [],
       parsedContent: null,

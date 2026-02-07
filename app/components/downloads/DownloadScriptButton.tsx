@@ -18,6 +18,7 @@ export default function DownloadScriptButton({ stage, label }: Props) {
   const openrouterPrompt = useAppStore((s) => s.openrouterPrompt);
   const pdfEngine = useAppStore((s) => s.pdfEngine);
   const excelColumn = useAppStore((s) => s.excelColumn);
+  const excelSheet = useAppStore((s) => s.excelSheet);
   const voyageModel = useAppStore((s) => s.voyageModel);
   const pineconeIndexName = useAppStore((s) => s.pineconeIndexName);
   const pineconeEnvKey = useAppStore((s) => s.pineconeEnvKey);
@@ -35,6 +36,8 @@ export default function DownloadScriptButton({ stage, label }: Props) {
       const { PINECONE_ENVIRONMENTS } = await import("@/app/lib/constants");
 
       const env = PINECONE_ENVIRONMENTS.find((e) => e.key === pineconeEnvKey);
+      
+      const isSpreadsheet = pipeline === PIPELINE.EXCEL_SPREADSHEET || pipeline === PIPELINE.CSV_SPREADSHEET;
 
       const config: ScriptConfig = {
         pipeline,
@@ -42,7 +45,8 @@ export default function DownloadScriptButton({ stage, label }: Props) {
         openrouterModel,
         openrouterPrompt,
         pdfEngine,
-        excelColumn: pipeline === PIPELINE.EXCEL_SPREADSHEET ? excelColumn : undefined,
+        excelColumn: isSpreadsheet ? excelColumn : undefined,
+        excelSheet: isSpreadsheet ? excelSheet : undefined,
         voyageModel,
         pineconeIndexName,
         pineconeCloud: env?.cloud,
@@ -57,7 +61,7 @@ export default function DownloadScriptButton({ stage, label }: Props) {
     }
   }, [
     pipeline, chunkingParams, parsedFilename, openrouterModel,
-    openrouterPrompt, pdfEngine, excelColumn, voyageModel,
+    openrouterPrompt, pdfEngine, excelColumn, excelSheet, voyageModel,
     pineconeIndexName, pineconeEnvKey, stage,
   ]);
 

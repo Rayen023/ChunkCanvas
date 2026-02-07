@@ -3,6 +3,7 @@
 export const PIPELINE = {
   SIMPLE_TEXT: "Simple Text",
   EXCEL_SPREADSHEET: "Excel Spreadsheet",
+  CSV_SPREADSHEET: "CSV Spreadsheet",
   OPENROUTER_PDF: "OpenRouter — PDF Parsing (Multimodal LLM)",
   OPENROUTER_IMAGE: "OpenRouter — Image Parsing (Multimodal LLM)",
   OPENROUTER_AUDIO: "OpenRouter — Audio Parsing (Multimodal LLM)",
