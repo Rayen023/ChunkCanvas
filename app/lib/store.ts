@@ -3,7 +3,7 @@
  */
 import { create } from "zustand";
 import type { ChunkingParams, EmbeddingProvider, PdfEngine } from "./types";
-import { DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP, DEFAULT_SEPARATORS } from "./constants";
+import { DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP, DEFAULT_SEPARATORS, DEFAULT_OLLAMA_ENDPOINT, DEFAULT_EMBEDDING_DIMENSIONS } from "./constants";
 
 export interface AppState {
   // ── Step 1 ────────────────────────────────────
@@ -19,6 +19,11 @@ export interface AppState {
   excelSheets: string[];
   excelColumn: string;
   excelColumns: string[];
+
+  // Ollama parsing
+  ollamaEndpoint: string;
+  ollamaModel: string;
+  ollamaPrompt: string;
 
   // ── Step 3 — parsed result ────────────────────
   parsedContent: string | null;
@@ -44,7 +49,9 @@ export interface AppState {
   voyageApiKey: string;
   voyageModel: string;
   openrouterEmbeddingModel: string;
-  openrouterEmbeddingDimensions: number;
+  embeddingDimensions: number;
+  ollamaEmbeddingModel: string;
+  ollamaEmbeddingEndpoint: string;
   embeddingsData: number[][] | null;
   isEmbedding: boolean;
   embeddingError: string | null;
@@ -91,6 +98,11 @@ export interface AppActions {
   setExcelColumn: (col: string) => void;
   setExcelColumns: (cols: string[]) => void;
 
+  // Ollama parsing
+  setOllamaEndpoint: (ep: string) => void;
+  setOllamaModel: (model: string) => void;
+  setOllamaPrompt: (prompt: string) => void;
+
   // Step 3
   setParsedContent: (content: string | null) => void;
   setParsedFilename: (name: string) => void;
@@ -114,7 +126,9 @@ export interface AppActions {
   setVoyageApiKey: (key: string) => void;
   setVoyageModel: (model: string) => void;
   setOpenrouterEmbeddingModel: (model: string) => void;
-  setOpenrouterEmbeddingDimensions: (dims: number) => void;
+  setEmbeddingDimensions: (dims: number) => void;
+  setOllamaEmbeddingModel: (model: string) => void;
+  setOllamaEmbeddingEndpoint: (ep: string) => void;
   setEmbeddingsData: (data: number[][] | null) => void;
   setIsEmbedding: (v: boolean) => void;
   setEmbeddingError: (err: string | null) => void;
@@ -163,6 +177,12 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   excelSheets: [],
   excelColumn: "",
   excelColumns: [],
+
+  // Ollama parsing
+  ollamaEndpoint: DEFAULT_OLLAMA_ENDPOINT,
+  ollamaModel: "",
+  ollamaPrompt: "",
+
   parsedContent: null,
   parsedFilename: "",
   parsedDocType: "",
@@ -182,7 +202,9 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   voyageApiKey: "",
   voyageModel: "voyage-4",
   openrouterEmbeddingModel: "qwen/qwen3-embedding-8b",
-  openrouterEmbeddingDimensions: 1024,
+  embeddingDimensions: DEFAULT_EMBEDDING_DIMENSIONS,
+  ollamaEmbeddingModel: "",
+  ollamaEmbeddingEndpoint: DEFAULT_OLLAMA_ENDPOINT,
   embeddingsData: null,
   isEmbedding: false,
   embeddingError: null,
@@ -219,6 +241,10 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   setExcelSheets: (sheets) => set({ excelSheets: sheets }),
   setExcelColumn: (col) => set({ excelColumn: col }),
   setExcelColumns: (cols) => set({ excelColumns: cols }),
+
+  setOllamaEndpoint: (ep) => set({ ollamaEndpoint: ep }),
+  setOllamaModel: (model) => set({ ollamaModel: model }),
+  setOllamaPrompt: (prompt) => set({ ollamaPrompt: prompt }),
 
   setParsedContent: (content) => set({ parsedContent: content }),
   setParsedFilename: (name) => set({ parsedFilename: name }),
@@ -263,7 +289,9 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   setVoyageApiKey: (key) => set({ voyageApiKey: key }),
   setVoyageModel: (model) => set({ voyageModel: model }),
   setOpenrouterEmbeddingModel: (model) => set({ openrouterEmbeddingModel: model }),
-  setOpenrouterEmbeddingDimensions: (dims) => set({ openrouterEmbeddingDimensions: dims }),
+  setEmbeddingDimensions: (dims) => set({ embeddingDimensions: dims }),
+  setOllamaEmbeddingModel: (model) => set({ ollamaEmbeddingModel: model }),
+  setOllamaEmbeddingEndpoint: (ep) => set({ ollamaEmbeddingEndpoint: ep }),
   setEmbeddingsData: (data) => set({ embeddingsData: data }),
   setIsEmbedding: (v) => set({ isEmbedding: v }),
   setEmbeddingError: (err) => set({ embeddingError: err }),
@@ -309,6 +337,9 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
       excelSheets: [],
       excelColumn: "",
       excelColumns: [],
+      ollamaEndpoint: DEFAULT_OLLAMA_ENDPOINT,
+      ollamaModel: "",
+      ollamaPrompt: "",
       parsedContent: null,
       parsedFilename: "",
       parsedDocType: "",
@@ -328,7 +359,9 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
       voyageApiKey: s.envKeys.voyage || "",
       voyageModel: "voyage-4",
       openrouterEmbeddingModel: "qwen/qwen3-embedding-8b",
-      openrouterEmbeddingDimensions: 1024,
+      embeddingDimensions: DEFAULT_EMBEDDING_DIMENSIONS,
+      ollamaEmbeddingModel: "",
+      ollamaEmbeddingEndpoint: DEFAULT_OLLAMA_ENDPOINT,
       embeddingsData: null,
       isEmbedding: false,
       embeddingError: null,

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/app/lib/store";
 import AppInfo from "./AppInfo";
 import VllmStatus from "./VllmStatus";
+import OllamaStatus from "./OllamaStatus";
 
 const MIN_WIDTH = 220;
 const MAX_WIDTH = 480;
@@ -142,6 +143,10 @@ export default function Sidebar() {
           <div className="h-px bg-silver-light" />
 
           <VllmStatus />
+
+          <div className="h-px bg-silver-light" />
+
+          <OllamaStatus />
         </div>
 
         {/* ── Footer ──────────────────────────────────── */}

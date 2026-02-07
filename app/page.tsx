@@ -17,6 +17,10 @@ const ExcelForm = dynamic(
   () => import("./components/pipeline-forms/ExcelForm"),
   { loading: () => <FormSkeleton /> },
 );
+const OllamaForm = dynamic(
+  () => import("./components/pipeline-forms/OllamaForm"),
+  { loading: () => <FormSkeleton /> },
+);
 const ParsedDocumentView = dynamic(
   () => import("./components/parsing/ParsedDocumentView"),
 );
@@ -113,6 +117,7 @@ export default function Home() {
   }, [editedChunks.length, embeddingsData, setScrollActiveStep]);
 
   const isOpenRouter = pipeline.startsWith("OpenRouter");
+  const isOllama = pipeline.startsWith("Ollama");
   const showForm = !!pipeline;
   const canProcess =
     !!file &&
@@ -144,6 +149,9 @@ export default function Home() {
         openrouterModel: state.openrouterModel,
         openrouterPrompt: state.openrouterPrompt,
         pdfEngine: state.pdfEngine,
+        ollamaEndpoint: state.ollamaEndpoint,
+        ollamaModel: state.ollamaModel,
+        ollamaPrompt: state.ollamaPrompt,
         excelColumn: state.excelColumn,
         excelSheet: state.excelSheet,
         onProgress: (pct, msg) => state.setParseProgress(pct, msg),
@@ -238,6 +246,7 @@ export default function Home() {
 
           {/* Pipeline-specific form */}
           {isOpenRouter && <OpenRouterForm />}
+          {isOllama && <OllamaForm />}
           {(pipeline === PIPELINE.EXCEL_SPREADSHEET ||
             pipeline === PIPELINE.CSV_SPREADSHEET) && <ExcelForm />}
           {pipeline === PIPELINE.SIMPLE_TEXT && (

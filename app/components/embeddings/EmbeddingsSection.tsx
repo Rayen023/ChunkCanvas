@@ -2,9 +2,15 @@
 
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useAppStore } from "@/app/lib/store";
-import { VOYAGE_MODELS, EMBEDDING_MODELS, OPENROUTER_DEFAULT_EMBEDDING_MODEL, OPENROUTER_DEFAULT_EMBEDDING_DIMENSIONS } from "@/app/lib/constants";
+import { VOYAGE_MODELS, EMBEDDING_MODELS, OPENROUTER_DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_ENDPOINT } from "@/app/lib/constants";
 import DownloadScriptButton from "../downloads/DownloadScriptButton";
 import type { EmbeddingsJson, EmbeddingProvider } from "@/app/lib/types";
+
+interface OllamaEmbedModel {
+  name: string;
+  parameterSize?: string;
+  embeddingDimensions?: number;
+}
 
 /** Format pricing for display: convert per-token price to $/M tokens */
 function formatPricing(pricePerToken: string): string {
@@ -44,10 +50,23 @@ export default function EmbeddingsSection() {
   const openrouterApiKey = useAppStore((s) => s.openrouterApiKey);
   const envOpenrouterKey = useAppStore((s) => s.envKeys.openrouter);
   const openrouterEmbeddingModel = useAppStore((s) => s.openrouterEmbeddingModel);
-  const openrouterEmbeddingDimensions = useAppStore((s) => s.openrouterEmbeddingDimensions);
   const setOpenrouterApiKey = useAppStore((s) => s.setOpenrouterApiKey);
   const setOpenrouterEmbeddingModel = useAppStore((s) => s.setOpenrouterEmbeddingModel);
-  const setOpenrouterEmbeddingDimensions = useAppStore((s) => s.setOpenrouterEmbeddingDimensions);
+
+  // Ollama state
+  const ollamaEmbeddingModel = useAppStore((s) => s.ollamaEmbeddingModel);
+  const ollamaEmbeddingEndpoint = useAppStore((s) => s.ollamaEmbeddingEndpoint);
+  const setOllamaEmbeddingModel = useAppStore((s) => s.setOllamaEmbeddingModel);
+  const setOllamaEmbeddingEndpoint = useAppStore((s) => s.setOllamaEmbeddingEndpoint);
+
+  // Shared embedding dimensions
+  const embeddingDimensions = useAppStore((s) => s.embeddingDimensions);
+  const setEmbeddingDimensions = useAppStore((s) => s.setEmbeddingDimensions);
+
+  // Ollama embedding models
+  const [ollamaEmbedModels, setOllamaEmbedModels] = useState<OllamaEmbedModel[]>([]);
+  const [loadingOllamaModels, setLoadingOllamaModels] = useState(false);
+  const [ollamaModelError, setOllamaModelError] = useState<string | null>(null);
 
   // Shared embedding state
   const embeddingsData = useAppStore((s) => s.embeddingsData);
@@ -90,23 +109,69 @@ export default function EmbeddingsSection() {
     }
   }, [orEmbeddingModels, openrouterEmbeddingModel, embeddingProvider, setOpenrouterEmbeddingModel]);
 
+  // Fetch Ollama embedding models when provider is ollama
+  const fetchOllamaEmbedModels = useCallback(async () => {
+    setLoadingOllamaModels(true);
+    setOllamaModelError(null);
+    try {
+      const { listOllamaModelsEnriched, filterEmbeddingModels } = await import("@/app/lib/ollama");
+      const all = await listOllamaModelsEnriched(ollamaEmbeddingEndpoint);
+      const embedModels = filterEmbeddingModels(all);
+      setOllamaEmbedModels(embedModels.map((m) => ({
+        name: m.name,
+        parameterSize: m.parameterSize,
+        embeddingDimensions: m.embeddingDimensions,
+      })));
+    } catch (err) {
+      setOllamaModelError(err instanceof Error ? err.message : "Failed to fetch Ollama models");
+      setOllamaEmbedModels([]);
+    } finally {
+      setLoadingOllamaModels(false);
+    }
+  }, [ollamaEmbeddingEndpoint]);
+
+  useEffect(() => {
+    if (embeddingProvider === "ollama") {
+      fetchOllamaEmbedModels();
+    }
+  }, [embeddingProvider, fetchOllamaEmbedModels]);
+
+  // Ensure selected Ollama embedding model is valid
+  useEffect(() => {
+    if (
+      embeddingProvider === "ollama" &&
+      ollamaEmbedModels.length > 0 &&
+      !ollamaEmbedModels.find((m) => m.name === ollamaEmbeddingModel)
+    ) {
+      setOllamaEmbeddingModel(ollamaEmbedModels[0].name);
+    }
+  }, [ollamaEmbedModels, ollamaEmbeddingModel, embeddingProvider, setOllamaEmbeddingModel]);
+
   // Current active model name for display
   const activeModelLabel = useMemo(() => {
     if (embeddingProvider === "voyage") {
       return VOYAGE_MODELS.find((m) => m.key === voyageModel)?.label ?? voyageModel;
     }
+    if (embeddingProvider === "ollama") {
+      return ollamaEmbeddingModel || "Ollama";
+    }
     return orEmbeddingModels.find((m) => m.id === openrouterEmbeddingModel)?.name ?? openrouterEmbeddingModel;
-  }, [embeddingProvider, voyageModel, openrouterEmbeddingModel, orEmbeddingModels]);
+  }, [embeddingProvider, voyageModel, openrouterEmbeddingModel, ollamaEmbeddingModel, orEmbeddingModels]);
 
   // Can generate?
-  const canGenerate =
-    embeddingProvider === "voyage"
-      ? !!voyageApiKey && editedChunks.length > 0
-      : !!openrouterApiKey && editedChunks.length > 0;
+  const canGenerate = useMemo(() => {
+    if (editedChunks.length === 0) return false;
+    if (embeddingProvider === "voyage") return !!voyageApiKey;
+    if (embeddingProvider === "ollama") return !!ollamaEmbeddingModel;
+    return !!openrouterApiKey;
+  }, [embeddingProvider, voyageApiKey, openrouterApiKey, ollamaEmbeddingModel, editedChunks.length]);
 
   // The embedding model key for metadata
-  const embeddingModelKey =
-    embeddingProvider === "voyage" ? voyageModel : openrouterEmbeddingModel;
+  const embeddingModelKey = useMemo(() => {
+    if (embeddingProvider === "voyage") return voyageModel;
+    if (embeddingProvider === "ollama") return ollamaEmbeddingModel;
+    return openrouterEmbeddingModel;
+  }, [embeddingProvider, voyageModel, openrouterEmbeddingModel, ollamaEmbeddingModel]);
 
   // Generate embeddings
   const handleGenerate = useCallback(async () => {
@@ -124,9 +189,20 @@ export default function EmbeddingsSection() {
           editedChunks,
         );
         setEmbeddingsData(embeddings);
+      } else if (embeddingProvider === "ollama") {
+        const { generateOllamaEmbeddings } = await import("@/app/lib/ollama");
+        const dims = embeddingDimensions > 0 ? embeddingDimensions : undefined;
+        const embeddings = await generateOllamaEmbeddings(
+          ollamaEmbeddingModel,
+          editedChunks,
+          ollamaEmbeddingEndpoint,
+          undefined, // batchSize — use default
+          dims,
+        );
+        setEmbeddingsData(embeddings);
       } else {
         const { generateOpenRouterEmbeddings } = await import("@/app/lib/openrouter");
-        const dims = openrouterEmbeddingDimensions > 0 ? openrouterEmbeddingDimensions : undefined;
+        const dims = embeddingDimensions > 0 ? embeddingDimensions : undefined;
         const embeddings = await generateOpenRouterEmbeddings(
           openrouterApiKey,
           openrouterEmbeddingModel,
@@ -144,7 +220,9 @@ export default function EmbeddingsSection() {
   }, [
     canGenerate, embeddingProvider,
     voyageApiKey, voyageModel,
-    openrouterApiKey, openrouterEmbeddingModel, openrouterEmbeddingDimensions,
+    openrouterApiKey, openrouterEmbeddingModel,
+    ollamaEmbeddingModel, ollamaEmbeddingEndpoint,
+    embeddingDimensions,
     editedChunks,
     setIsEmbedding, setEmbeddingError, setEmbeddingsData,
   ]);
@@ -214,6 +292,16 @@ export default function EmbeddingsSection() {
           >
             Voyage AI
           </button>
+          <button
+            onClick={() => setEmbeddingProvider("ollama")}
+            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
+              embeddingProvider === "ollama"
+                ? "bg-sandy text-white border-sandy"
+                : "bg-white text-gunmetal border-silver hover:border-sandy"
+            }`}
+          >
+            Ollama
+          </button>
         </div>
       </div>
 
@@ -266,31 +354,6 @@ export default function EmbeddingsSection() {
               })}
             </select>
           </div>
-
-          {/* Embedding Dimensions */}
-          <div>
-            <label className="block text-sm font-medium text-gunmetal mb-1">
-              Output Dimensions
-              <span className="ml-1 text-xs text-silver-dark font-normal">
-                (0 = model default)
-              </span>
-            </label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={openrouterEmbeddingDimensions}
-              onChange={(e) => setOpenrouterEmbeddingDimensions(Math.max(0, parseInt(e.target.value) || 0))}
-              className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
-            />
-            <p className="mt-1 text-xs text-silver-dark">
-              Reduce dimensions to lower storage costs. Set to 0 to use the model&apos;s native dimensions
-              {orEmbeddingModels.find((m) => m.id === openrouterEmbeddingModel)?.dimensions
-                ? ` (${orEmbeddingModels.find((m) => m.id === openrouterEmbeddingModel)!.dimensions}d for this model)`
-                : ""
-              }.
-            </p>
-          </div>
         </>
       )}
 
@@ -331,6 +394,98 @@ export default function EmbeddingsSection() {
         </>
       )}
 
+      {/* ── Ollama Embeddings ── */}
+      {embeddingProvider === "ollama" && (
+        <>
+          {/* Endpoint */}
+          <div>
+            <label className="block text-sm font-medium text-gunmetal mb-1">
+              Ollama Endpoint
+            </label>
+            <input
+              type="text"
+              value={ollamaEmbeddingEndpoint}
+              onChange={(e) => setOllamaEmbeddingEndpoint(e.target.value)}
+              placeholder={DEFAULT_OLLAMA_ENDPOINT}
+              className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+            />
+          </div>
+
+          {/* Model */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gunmetal">
+                Embedding Model
+                {loadingOllamaModels && (
+                  <span className="ml-2 text-xs text-silver-dark animate-pulse">
+                    Loading…
+                  </span>
+                )}
+                {!loadingOllamaModels && ollamaEmbedModels.length > 0 && (
+                  <span className="ml-2 text-xs text-silver-dark font-normal">
+                    ({ollamaEmbedModels.length} model{ollamaEmbedModels.length !== 1 ? "s" : ""})
+                  </span>
+                )}
+              </label>
+              <button
+                onClick={fetchOllamaEmbedModels}
+                disabled={loadingOllamaModels}
+                className="text-xs text-sandy hover:text-sandy-dark cursor-pointer disabled:opacity-50"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {ollamaModelError && (
+              <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-700">
+                {ollamaModelError}
+              </div>
+            )}
+
+            {!loadingOllamaModels && ollamaEmbedModels.length === 0 && !ollamaModelError && (
+              <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-700">
+                No embedding models found. Pull one with e.g. <code>ollama pull embeddinggemma</code> or <code>ollama pull all-minilm</code>.
+                Models with &quot;embed&quot; or &quot;bge&quot; in their name are detected.
+              </div>
+            )}
+
+            <select
+              value={ollamaEmbeddingModel}
+              onChange={(e) => setOllamaEmbeddingModel(e.target.value)}
+              disabled={ollamaEmbedModels.length === 0}
+              className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none disabled:opacity-50"
+            >
+              {ollamaEmbedModels.length === 0 && (
+                <option value="">No embedding models available</option>
+              )}
+              {ollamaEmbedModels.map((m) => {
+                const dimsLabel = m.embeddingDimensions ? ` — ${m.embeddingDimensions}d` : "";
+                return (
+                  <option key={m.name} value={m.name}>
+                    {m.name}{m.parameterSize ? ` (${m.parameterSize})` : ""}{dimsLabel}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        </>
+      )}
+
+      {/* ── Shared Output Dimensions ── */}
+      <div>
+        <label className="block text-sm font-medium text-gunmetal mb-1">
+          Output Dimensions
+        </label>
+        <input
+          type="number"
+          min={0}
+          step={1}
+          value={embeddingDimensions}
+          onChange={(e) => setEmbeddingDimensions(Math.max(0, parseInt(e.target.value) || 0))}
+          className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+        />
+      </div>
+
       {/* Generate Button */}
       <button
         onClick={handleGenerate}
@@ -363,7 +518,7 @@ export default function EmbeddingsSection() {
           <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
             Generated {embeddingsData.length} embeddings (
             {embeddingsData[0]?.length ?? 0} dimensions each) using{" "}
-            {embeddingProvider === "voyage" ? "Voyage AI" : "OpenRouter"}.
+            {embeddingProvider === "voyage" ? "Voyage AI" : embeddingProvider === "ollama" ? "Ollama" : "OpenRouter"}.
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

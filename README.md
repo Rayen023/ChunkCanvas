@@ -34,3 +34,13 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+# Ollama
+/mnt/0a56cc8f-eb63-4f04-b727-0615646b8bdb/ollama_models
+
+curl http://localhost:11434/api/tags
+
+sudo chown -R ollama:ollama /mnt/0a56cc8f-eb63-4f04-b727-0615646b8bdb/ollama_models
+
+
+https://ollama.com/search?c=vision

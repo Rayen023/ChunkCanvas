@@ -28,8 +28,8 @@ export interface ScriptConfig {
   voyageModel?: string;
   // OpenRouter embedding model
   openrouterEmbeddingModel?: string;
-  // OpenRouter embedding dimensions
-  openrouterEmbeddingDimensions?: number;
+  // Embedding dimensions (shared across providers)
+  embeddingDimensions?: number;
   // Pinecone (for pinecone stage)
   pineconeIndexName?: string;
   pineconeCloud?: string;
@@ -620,7 +620,7 @@ export function generatePipelineScript(
         config.voyageModel ?? "voyage-4",
         config.openrouterEmbeddingModel ?? "qwen/qwen3-embedding-8b",
         isSpreadsheet,
-        config.openrouterEmbeddingDimensions,
+        config.embeddingDimensions,
       );
       break;
     case "pinecone":
@@ -632,7 +632,7 @@ export function generatePipelineScript(
         config.pineconeCloud ?? "aws",
         config.pineconeRegion ?? "us-east-1",
         isSpreadsheet,
-        config.openrouterEmbeddingDimensions,
+        config.embeddingDimensions,
       );
       break;
   }

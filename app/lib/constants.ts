@@ -33,6 +33,10 @@ export const PIPELINE_ALLOWED_EXTENSIONS: Record<string, Set<string>> = {
   [PIPELINE.OPENROUTER_VIDEO]: new Set([
     "mp4", "mpeg", "mov", "webm", "mkv", "avi",
   ]),
+  [PIPELINE.OLLAMA_PDF]: new Set(["pdf"]),
+  [PIPELINE.OLLAMA_IMAGE]: new Set([
+    "png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif",
+  ]),
 };
 
 /** Every extension the app accepts */
@@ -117,7 +121,7 @@ export const VIDEO_MIME: Record<string, string> = {
 
 export const OPENROUTER_DEFAULT_EMBEDDING_MODEL = "qwen/qwen3-embedding-8b";
 export const OPENROUTER_EMBEDDING_BATCH_SIZE = 128;
-export const OPENROUTER_DEFAULT_EMBEDDING_DIMENSIONS = 1024;
+export const DEFAULT_EMBEDDING_DIMENSIONS = 1024;
 
 /** OpenRouter embedding models — loaded from generated JSON. */
 export const EMBEDDING_MODELS: OpenRouterModelFull[] =
@@ -185,3 +189,7 @@ export const DEFAULT_SEPARATORS_DISPLAY = "\\n\\n, \\n# , \\n## , \\n### , \\n--
 // ─── vLLM ─────────────────────────────────────────────────────────────────
 
 export const DEFAULT_VLLM_ENDPOINT = "http://localhost:8734";
+
+// ─── Ollama ───────────────────────────────────────────────────────────────
+
+export const DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434";

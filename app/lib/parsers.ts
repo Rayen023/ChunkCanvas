@@ -94,6 +94,10 @@ export interface ParseOptions {
   openrouterModel?: string;
   openrouterPrompt?: string;
   pdfEngine?: PdfEngine;
+  // Ollama-specific
+  ollamaEndpoint?: string;
+  ollamaModel?: string;
+  ollamaPrompt?: string;
   // Excel-specific
   excelColumn?: string;
   excelSheet?: string;
@@ -179,6 +183,33 @@ export async function parseDocument(opts: ParseOptions): Promise<ParseResult> {
         opts.openrouterPrompt!,
         opts.signal,
         opts.onProgress,
+      );
+      return { content };
+    }
+
+    // ── Ollama PDF (Vision) ──────────────────────────────────────
+    case PIPELINE.OLLAMA_PDF: {
+      const { processPdfWithOllama } = await import("./ollama");
+      const content = await processPdfWithOllama(
+        opts.ollamaModel!,
+        opts.file,
+        opts.ollamaPrompt!,
+        opts.onProgress,
+        opts.signal,
+        opts.ollamaEndpoint,
+      );
+      return { content };
+    }
+
+    // ── Ollama Image (Vision) ────────────────────────────────────
+    case PIPELINE.OLLAMA_IMAGE: {
+      const { processImageWithOllama } = await import("./ollama");
+      const content = await processImageWithOllama(
+        opts.ollamaModel!,
+        opts.file,
+        opts.ollamaPrompt!,
+        opts.ollamaEndpoint,
+        opts.signal,
       );
       return { content };
     }
