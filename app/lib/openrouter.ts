@@ -117,7 +117,6 @@ async function callOpenRouter(
 
 let _modelsCache: { data: OpenRouterModel[]; ts: number } | null = null;
 let _modelsFullCache: { data: OpenRouterModelFull[]; ts: number } | null = null;
-let _embeddingModelsCache: { data: OpenRouterModelFull[]; ts: number } | null = null;
 const CACHE_TTL = 600_000; // 10 minutes
 
 /** Parse raw model data from OpenRouter API into full model objects */
@@ -155,11 +154,14 @@ export async function fetchAvailableModels(
   }
 
   try {
+    const headers: Record<string, string> = {};
+    if (apiKey) {
+      headers.Authorization = `Bearer ${apiKey}`;
+    }
+
+    console.log("[OpenRouter] Fetching models...");
     const res = await fetch(`${OPENROUTER_API_URL}/models`, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers,
     });
 
     if (!res.ok) throw new Error(`${res.status}`);
@@ -196,11 +198,14 @@ export async function fetchAvailableModelsFull(
   }
 
   try {
+    const headers: Record<string, string> = {};
+    if (apiKey) {
+      headers.Authorization = `Bearer ${apiKey}`;
+    }
+
+    console.log("[OpenRouter] Fetching full models...");
     const res = await fetch(`${OPENROUTER_API_URL}/models`, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers,
     });
 
     if (!res.ok) throw new Error(`${res.status}`);
@@ -220,13 +225,13 @@ export async function fetchAvailableModelsFull(
 
     return models;
   } catch {
-    const { FALLBACK_EMBEDDING_MODELS } = await import("./constants");
+    const { EMBEDDING_MODELS } = await import("./constants");
     return [...Object.values(FALLBACK_MODELS).map((m) => ({
       ...m,
       output_modalities: ["text"],
       context_length: 0,
       pricing: { prompt: "0", completion: "0" },
-    })), ...FALLBACK_EMBEDDING_MODELS];
+    })), ...EMBEDDING_MODELS];
   }
 }
 
@@ -237,54 +242,6 @@ export function getEmbeddingModels(
   return models.filter((m) =>
     m.output_modalities.includes("embeddings"),
   );
-}
-
-/**
- * Fetch embedding models directly from the dedicated /embeddings/models endpoint.
- * Falls back to filtering from the general /models endpoint, then to hardcoded fallbacks.
- */
-export async function fetchEmbeddingModelsDirect(
-  apiKey: string,
-): Promise<OpenRouterModelFull[]> {
-  if (_embeddingModelsCache && Date.now() - _embeddingModelsCache.ts < CACHE_TTL) {
-    return _embeddingModelsCache.data;
-  }
-
-  try {
-    const res = await fetch(`${OPENROUTER_API_URL}/embeddings/models`, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-    });
-
-    if (!res.ok) throw new Error(`${res.status}`);
-    const json = await res.json();
-    const models = parseModelData(json.data ?? []);
-
-    if (models.length > 0) {
-      _embeddingModelsCache = { data: models, ts: Date.now() };
-      return models;
-    }
-    // If endpoint returned empty, fall through to general models
-  } catch {
-    // Fall through to general models filtering
-  }
-
-  // Fallback: fetch all models and filter
-  try {
-    const allModels = await fetchAvailableModelsFull(apiKey);
-    const embModels = getEmbeddingModels(allModels);
-    if (embModels.length > 0) {
-      _embeddingModelsCache = { data: embModels, ts: Date.now() };
-      return embModels;
-    }
-  } catch {
-    // Fall through to hardcoded
-  }
-
-  const { FALLBACK_EMBEDDING_MODELS } = await import("./constants");
-  return FALLBACK_EMBEDDING_MODELS;
 }
 
 /** Get models for a given input modality with full metadata */

@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useAppStore } from "@/app/lib/store";
-import { VOYAGE_MODELS, FALLBACK_EMBEDDING_MODELS, OPENROUTER_DEFAULT_EMBEDDING_MODEL, KNOWN_EMBEDDING_DIMENSIONS, OPENROUTER_DEFAULT_EMBEDDING_DIMENSIONS } from "@/app/lib/constants";
+import { VOYAGE_MODELS, EMBEDDING_MODELS, OPENROUTER_DEFAULT_EMBEDDING_MODEL, OPENROUTER_DEFAULT_EMBEDDING_DIMENSIONS } from "@/app/lib/constants";
 import DownloadScriptButton from "../downloads/DownloadScriptButton";
-import type { EmbeddingsJson, EmbeddingProvider, OpenRouterModelFull } from "@/app/lib/types";
+import type { EmbeddingsJson, EmbeddingProvider } from "@/app/lib/types";
 
 /** Format pricing for display: convert per-token price to $/M tokens */
 function formatPricing(pricePerToken: string): string {
@@ -59,9 +59,16 @@ export default function EmbeddingsSection() {
 
   const [downloadingJson, setDownloadingJson] = useState(false);
 
-  // OpenRouter embedding models fetch
-  const [orEmbeddingModels, setOrEmbeddingModels] = useState<OpenRouterModelFull[]>([]);
-  const [loadingModels, setLoadingModels] = useState(false);
+  // OpenRouter embedding models — loaded from generated JSON (run `npm run update-models` to refresh)
+  const orEmbeddingModels = useMemo(() => {
+    const sorted = [...EMBEDDING_MODELS];
+    sorted.sort((a, b) => {
+      if (a.id === OPENROUTER_DEFAULT_EMBEDDING_MODEL) return -1;
+      if (b.id === OPENROUTER_DEFAULT_EMBEDDING_MODEL) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    return sorted;
+  }, []);
 
   // Auto-fill env keys
   useEffect(() => {
@@ -71,37 +78,6 @@ export default function EmbeddingsSection() {
   useEffect(() => {
     if (!openrouterApiKey && envOpenrouterKey) setOpenrouterApiKey(envOpenrouterKey);
   }, [openrouterApiKey, envOpenrouterKey, setOpenrouterApiKey]);
-
-  // Fetch OpenRouter embedding models via dedicated endpoint
-  const fetchEmbeddingModels = useCallback(async () => {
-    if (!openrouterApiKey) {
-      setOrEmbeddingModels(FALLBACK_EMBEDDING_MODELS);
-      return;
-    }
-    setLoadingModels(true);
-    try {
-      const { fetchAvailableModelsFull, getEmbeddingModels } = await import("@/app/lib/openrouter");
-      const allModels = await fetchAvailableModelsFull(openrouterApiKey);
-      const embModels = getEmbeddingModels(allModels);
-      // Sort: default first, then alphabetically
-      embModels.sort((a, b) => {
-        if (a.id === OPENROUTER_DEFAULT_EMBEDDING_MODEL) return -1;
-        if (b.id === OPENROUTER_DEFAULT_EMBEDDING_MODEL) return 1;
-        return a.name.localeCompare(b.name);
-      });
-      setOrEmbeddingModels(embModels.length > 0 ? embModels : FALLBACK_EMBEDDING_MODELS);
-    } catch {
-      setOrEmbeddingModels(FALLBACK_EMBEDDING_MODELS);
-    } finally {
-      setLoadingModels(false);
-    }
-  }, [openrouterApiKey]);
-
-  useEffect(() => {
-    if (embeddingProvider === "openrouter") {
-      fetchEmbeddingModels();
-    }
-  }, [embeddingProvider, fetchEmbeddingModels]);
 
   // Ensure selected OR embedding model is valid
   useEffect(() => {
@@ -267,11 +243,9 @@ export default function EmbeddingsSection() {
           <div>
             <label className="block text-sm font-medium text-gunmetal mb-1">
               Embedding Model
-              {loadingModels && (
-                <span className="ml-2 text-xs text-silver-dark animate-pulse">
-                  Loading models…
-                </span>
-              )}
+              <span className="ml-2 text-xs text-silver-dark font-normal">
+                ({orEmbeddingModels.length} models)
+              </span>
             </label>
             <select
               value={openrouterEmbeddingModel}
@@ -282,7 +256,7 @@ export default function EmbeddingsSection() {
                 const inPrice = formatPricing(m.pricing.prompt);
                 const outPrice = formatPricing(m.pricing.completion);
                 const ctx = formatCtx(m.context_length);
-                const dims = KNOWN_EMBEDDING_DIMENSIONS[m.id];
+                const dims = m.dimensions;
                 const dimsLabel = dims ? `${dims}d` : "";
                 return (
                   <option key={m.id} value={m.id}>
@@ -311,8 +285,8 @@ export default function EmbeddingsSection() {
             />
             <p className="mt-1 text-xs text-silver-dark">
               Reduce dimensions to lower storage costs. Set to 0 to use the model&apos;s native dimensions
-              {KNOWN_EMBEDDING_DIMENSIONS[openrouterEmbeddingModel]
-                ? ` (${KNOWN_EMBEDDING_DIMENSIONS[openrouterEmbeddingModel]}d for this model)`
+              {orEmbeddingModels.find((m) => m.id === openrouterEmbeddingModel)?.dimensions
+                ? ` (${orEmbeddingModels.find((m) => m.id === openrouterEmbeddingModel)!.dimensions}d for this model)`
                 : ""
               }.
             </p>

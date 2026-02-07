@@ -7,6 +7,13 @@ import {
   type OpenRouterModelFull,
 } from "./types";
 
+/**
+ * All model/config data loaded from generated JSON.
+ * Run `npm run update-models` to refresh from APIs.
+ * Source: app/lib/generated/models-data.json
+ */
+import generatedData from "./generated/models-data.json";
+
 // Re-export PIPELINE for convenience
 export { PIPELINE };
 
@@ -49,66 +56,12 @@ export const OPENROUTER_HEADERS_BASE = {
   "X-Title": "ChunkCanvas",
 };
 
-export const PDF_ENGINES: PdfEngineOption[] = [
-  {
-    key: "native",
-    label: "Native (No extra plugin cost — uses model's vision)",
-    description: "Sends PDF page as base64 images to the multimodal model",
-  },
-  {
-    key: "pdf-text",
-    label: "PDF-Text (extracts text from well-structured PDFs, free)",
-    description: "Pre-extracts text before sending to model",
-  },
-  {
-    key: "mistral-ocr",
-    label: "Mistral OCR (best for scanned docs / images, $2/1000 pages)",
-    description: "Uses Mistral's OCR service",
-  },
-];
+/** PDF processing engines — loaded from generated JSON. */
+export const PDF_ENGINES: PdfEngineOption[] = generatedData.pdfEngines as PdfEngineOption[];
 
-export const FALLBACK_MODELS: Record<string, OpenRouterModel> = {
-  "google/gemini-3-flash-preview": {
-    id: "google/gemini-3-flash-preview",
-    name: "Gemini 3 Flash Preview",
-    input_modalities: ["text", "image", "file", "audio", "video"],
-  },
-  "google/gemini-2.5-flash-preview": {
-    id: "google/gemini-2.5-flash-preview",
-    name: "Gemini 2.5 Flash Preview",
-    input_modalities: ["text", "image", "file", "audio", "video"],
-  },
-  "google/gemini-2.5-pro-preview": {
-    id: "google/gemini-2.5-pro-preview",
-    name: "Gemini 2.5 Pro Preview",
-    input_modalities: ["text", "image", "file", "audio", "video"],
-  },
-  "anthropic/claude-sonnet-4": {
-    id: "anthropic/claude-sonnet-4",
-    name: "Claude Sonnet 4",
-    input_modalities: ["text", "image", "file"],
-  },
-  "anthropic/claude-3.5-sonnet": {
-    id: "anthropic/claude-3.5-sonnet",
-    name: "Claude 3.5 Sonnet",
-    input_modalities: ["text", "image", "file"],
-  },
-  "openai/gpt-4.1": {
-    id: "openai/gpt-4.1",
-    name: "GPT-4.1",
-    input_modalities: ["text", "image", "file"],
-  },
-  "openai/gpt-4.1-mini": {
-    id: "openai/gpt-4.1-mini",
-    name: "GPT-4.1 Mini",
-    input_modalities: ["text", "image", "file"],
-  },
-  "meta-llama/llama-4-maverick": {
-    id: "meta-llama/llama-4-maverick",
-    name: "Llama 4 Maverick",
-    input_modalities: ["text", "image"],
-  },
-};
+/** Fallback parsing models (multimodal) — loaded from generated JSON. */
+export const FALLBACK_MODELS: Record<string, OpenRouterModel> =
+  generatedData.openrouterParsingModels as Record<string, OpenRouterModel>;
 
 // ─── Default Prompts ──────────────────────────────────────────────────────
 
@@ -166,100 +119,20 @@ export const OPENROUTER_DEFAULT_EMBEDDING_MODEL = "qwen/qwen3-embedding-8b";
 export const OPENROUTER_EMBEDDING_BATCH_SIZE = 128;
 export const OPENROUTER_DEFAULT_EMBEDDING_DIMENSIONS = 1024;
 
-/**
- * Known default embedding dimensions per model.
- * The OpenRouter API does not return this metadata, so we maintain a static map.
- * Models that support the `dimensions` parameter can output different sizes —
- * these are just the defaults.
- */
-export const KNOWN_EMBEDDING_DIMENSIONS: Record<string, number> = {
-  "qwen/qwen3-embedding-8b": 4096,
-  "qwen/qwen3-embedding-0.6b": 1024,
-  "openai/text-embedding-3-small": 1536,
-  "openai/text-embedding-3-large": 3072,
-  "openai/text-embedding-ada-002": 1536,
-  "google/text-embedding-004": 768,
-  "cohere/embed-english-v3.0": 1024,
-  "cohere/embed-multilingual-v3.0": 1024,
-  "cohere/embed-english-light-v3.0": 384,
-  "cohere/embed-multilingual-light-v3.0": 384,
-  "mistralai/mistral-embed": 1024,
-};
-
-export const FALLBACK_EMBEDDING_MODELS: OpenRouterModelFull[] = [
-  {
-    id: "qwen/qwen3-embedding-8b",
-    name: "Qwen3 Embedding 8B",
-    input_modalities: ["text"],
-    output_modalities: ["embeddings"],
-    context_length: 32768,
-    pricing: { prompt: "0.00000002", completion: "0" },
-  },
-  {
-    id: "qwen/qwen3-embedding-0.6b",
-    name: "Qwen3 Embedding 0.6B",
-    input_modalities: ["text"],
-    output_modalities: ["embeddings"],
-    context_length: 32768,
-    pricing: { prompt: "0.00000002", completion: "0" },
-  },
-  {
-    id: "openai/text-embedding-3-small",
-    name: "Text Embedding 3 Small",
-    input_modalities: ["text"],
-    output_modalities: ["embeddings"],
-    context_length: 8191,
-    pricing: { prompt: "0.00000002", completion: "0" },
-  },
-  {
-    id: "openai/text-embedding-3-large",
-    name: "Text Embedding 3 Large",
-    input_modalities: ["text"],
-    output_modalities: ["embeddings"],
-    context_length: 8191,
-    pricing: { prompt: "0.00000013", completion: "0" },
-  },
-];
+/** OpenRouter embedding models — loaded from generated JSON. */
+export const EMBEDDING_MODELS: OpenRouterModelFull[] =
+  generatedData.openrouterEmbeddingModels as OpenRouterModelFull[];
 
 // ─── Voyage AI ────────────────────────────────────────────────────────────
 
-export const VOYAGE_MODELS: VoyageModel[] = [
-  {
-    key: "voyage-4-large",
-    label: "Voyage 4 Large",
-    dimensions: 1024,
-    description: "Best general-purpose and multilingual retrieval quality",
-  },
-  {
-    key: "voyage-4",
-    label: "Voyage 4",
-    dimensions: 1024,
-    description: "Optimized for general-purpose and multilingual retrieval",
-  },
-  {
-    key: "voyage-4-lite",
-    label: "Voyage 4 Lite",
-    dimensions: 1024,
-    description: "Optimized for latency and cost",
-  },
-  {
-    key: "voyage-multimodal-3.5",
-    label: "Voyage Multimodal 3.5",
-    dimensions: 1024,
-    description: "Rich multimodal embedding model for text + images",
-  },
-];
+/** Voyage AI embedding models — loaded from generated JSON. */
+export const VOYAGE_MODELS: VoyageModel[] = generatedData.voyageModels as VoyageModel[];
 
 // ─── Pinecone ─────────────────────────────────────────────────────────────
 
-export const PINECONE_ENVIRONMENTS: PineconeEnvironment[] = [
-  { key: "aws-us-east-1", label: "AWS - US East (Virginia) - Starter, Standard, Enterprise", cloud: "aws", region: "us-east-1" },
-  { key: "aws-us-west-2", label: "AWS - US West (Oregon) - Standard, Enterprise", cloud: "aws", region: "us-west-2" },
-  { key: "aws-eu-west-1", label: "AWS - EU West (Ireland) - Standard, Enterprise", cloud: "aws", region: "eu-west-1" },
-  { key: "gcp-us-central1", label: "GCP - US Central (Iowa) - Standard, Enterprise", cloud: "gcp", region: "us-central1" },
-  { key: "gcp-europe-west4", label: "GCP - Europe West (Netherlands) - Standard, Enterprise", cloud: "gcp", region: "europe-west4" },
-  { key: "azure-eastus2", label: "Azure - East US 2 (Virginia) - Standard, Enterprise", cloud: "azure", region: "eastus2" },
-];
+/** Pinecone cloud environments — loaded from generated JSON. */
+export const PINECONE_ENVIRONMENTS: PineconeEnvironment[] =
+  generatedData.pineconeEnvironments as PineconeEnvironment[];
 
 // ─── Default Chunking Params ──────────────────────────────────────────────
 

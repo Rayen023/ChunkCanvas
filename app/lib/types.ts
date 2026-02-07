@@ -35,6 +35,8 @@ export interface OpenRouterModel {
 export interface OpenRouterModelFull extends OpenRouterModel {
   output_modalities: string[];
   context_length: number;
+  /** Output embedding dimensions (null if unknown). Only present for embedding models. */
+  dimensions?: number | null;
   pricing: {
     prompt: string;    // cost per token (string decimal)
     completion: string;

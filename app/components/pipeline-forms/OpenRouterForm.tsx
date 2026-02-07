@@ -60,16 +60,6 @@ export default function OpenRouterForm() {
   const [loadingModels, setLoadingModels] = useState(false);
 
   const fetchModels = useCallback(async () => {
-    if (!apiKey) {
-      // Convert fallback to full format
-      setAllModels(Object.values(FALLBACK_MODELS).map((m) => ({
-        ...m,
-        output_modalities: ["text"],
-        context_length: 0,
-        pricing: { prompt: "0", completion: "0" },
-      })));
-      return;
-    }
     setLoadingModels(true);
     try {
       const { fetchAvailableModelsFull } = await import("@/app/lib/openrouter");
