@@ -1,20 +1,26 @@
 export HF_HOME="/mnt/0a56cc8f-eb63-4f04-b727-0615646b8bdb/lerobot_cache/huggingface"
 export VLLM_CACHE_ROOT="/mnt/0a56cc8f-eb63-4f04-b727-0615646b8bdb/vllm"
-export VLLM_SERVER_DEV_MODE=1
+# export VLLM_SERVER_DEV_MODE=1
 # export VLLM_LOGGING_LEVEL=DEBUG
 
-MODEL_PATH="$1"
+MODEL_PATH="${1:-Qwen/Qwen3-VL-8B-Instruct-FP8}"
 # /mnt/0a56cc8f-eb63-4f04-b727-0615646b8bdb/vllm/Qwen3-0.6B-IQ4_XS.gguf
 # "/mnt/0a56cc8f-eb63-4f04-b727-0615646b8bdb/vllm/Qwen3-0.6B-Q3_K_M.gguf"
 # Qwen/Qwen3-VL-8B-Instruct-FP8
 source /home/recherche-a/OneDrive_recherche_a/Linux_onedrive/Projects_linux/chunkcanvas/backend/.venv/bin/activate
 
-vllm serve $MODEL_PATH \
-  --max-model-len 4096 \
-  --gpu-memory-utilization 0.9 \
+vllm serve jinaai/jina-embeddings-v3 \
+  --max-model-len 8000 \
+  --gpu-memory-utilization 0.7 \
   --enforce-eager \
-  --enable-sleep-mode \
   --port 8000 \
+  --trust-remote-code \
+  # --enable-sleep-mode \
+
+
+# /mnt/0a56cc8f-eb63-4f04-b727-0615646b8bdb/vllm/Qwen3-0.6B-IQ4_XS.gguf
+# "/mnt/0a56cc8f-eb63-4f04-b727-0615646b8bdb/vllm/Qwen3-0.6B-Q3_K_M.gguf"
+# Qwen/Qwen3-VL-8B-Instruct-FP8
 
   # --quantization mxfp4
 #   --max-num-batched-tokens 512 \
@@ -55,7 +61,7 @@ vllm serve $MODEL_PATH \
 # (APIServer pid=481999) INFO 02-08 01:45:33 [launcher.py:46] Route: /v1/embeddings, Methods: POST
 # (APIServer pid=481999) INFO 02-08 01:45:33 [launcher.py:46] Route: /score, Methods: POST
 # (APIServer pid=481999) INFO 02-08 01:45:33 [launcher.py:46] Route: /v1/score, Methods: POST
-# (APIServer pid=481999) INFO 02-08 01:45:33 [launcher.py:46] Route: /rerank, Methods: POST
+# (APIServer pid=481999) INFO 02-08 01:45:33 [launcher.py:46] Route: /rerank, Methods: POST   
 # (APIServer pid=481999) INFO 02-08 01:45:33 [launcher.py:46] Route: /v1/rerank, Methods: POST
 # (APIServer pid=481999) INFO 02-08 01:45:33 [launcher.py:46] Route: /v2/rerank, Methods: POST
 # (APIServer pid=481999) INFO 02-08 01:45:33 [launcher.py:46] Route: /pooling, Methods: POST

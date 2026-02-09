@@ -30,6 +30,11 @@ function formatCtx(ctx: number): string {
   return String(ctx);
 }
 
+interface VllmEmbedModel {
+  id: string;
+  max_model_len?: number;
+}
+
 export default function EmbeddingsSection() {
   const editedChunks = useAppStore((s) => s.editedChunks);
   const parsedFilename = useAppStore((s) => s.parsedFilename);
@@ -59,6 +64,12 @@ export default function EmbeddingsSection() {
   const setOllamaEmbeddingModel = useAppStore((s) => s.setOllamaEmbeddingModel);
   const setOllamaEmbeddingEndpoint = useAppStore((s) => s.setOllamaEmbeddingEndpoint);
 
+  // vLLM state
+  const vllmEmbeddingModel = useAppStore((s) => s.vllmEmbeddingModel);
+  const vllmEmbeddingEndpoint = useAppStore((s) => s.vllmEmbeddingEndpoint);
+  const setVllmEmbeddingModel = useAppStore((s) => s.setVllmEmbeddingModel);
+  const setVllmEmbeddingEndpoint = useAppStore((s) => s.setVllmEmbeddingEndpoint);
+
   // Shared embedding dimensions
   const embeddingDimensions = useAppStore((s) => s.embeddingDimensions);
   const setEmbeddingDimensions = useAppStore((s) => s.setEmbeddingDimensions);
@@ -67,6 +78,12 @@ export default function EmbeddingsSection() {
   const [ollamaEmbedModels, setOllamaEmbedModels] = useState<OllamaEmbedModel[]>([]);
   const [loadingOllamaModels, setLoadingOllamaModels] = useState(false);
   const [ollamaModelError, setOllamaModelError] = useState<string | null>(null);
+
+  // vLLM embedding models
+  const [vllmEmbedModels, setVllmEmbedModels] = useState<VllmEmbedModel[]>([]);
+  const [loadingVllmModels, setLoadingVllmModels] = useState(false);
+  const [vllmModelError, setVllmModelError] = useState<string | null>(null);
+  const [showVllmExample, setShowVllmExample] = useState(false);
 
   // Shared embedding state
   const embeddingsData = useAppStore((s) => s.embeddingsData);
@@ -147,6 +164,44 @@ export default function EmbeddingsSection() {
     }
   }, [ollamaEmbedModels, ollamaEmbeddingModel, embeddingProvider, setOllamaEmbeddingModel]);
 
+  // Fetch vLLM embedding models when provider is vllm
+  const fetchVllmEmbedModels = useCallback(async () => {
+    if (!vllmEmbeddingEndpoint) return;
+    setLoadingVllmModels(true);
+    setVllmModelError(null);
+    try {
+      const { listVllmModels } = await import("@/app/lib/vllm");
+      // Import type via dynamic import isn't ideal for casting, using standard fetch with types
+      const res = await fetch(`${vllmEmbeddingEndpoint}/v1/models`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) throw new Error(`vLLM /v1/models: ${res.status}`);
+      const json = await res.json();
+      const models = ((json.data ?? []) as { id: string; max_model_len?: number }[]).map(m => ({
+        id: m.id,
+        max_model_len: m.max_model_len
+      }));
+      setVllmEmbedModels(models);
+      if (models.length > 0 && (!vllmEmbeddingModel || !models.find(m => m.id === vllmEmbeddingModel))) {
+        setVllmEmbeddingModel(models[0].id);
+      }
+    } catch (err) {
+      setVllmModelError(err instanceof Error ? err.message : "Failed to fetch vLLM models");
+      setVllmEmbedModels([]);
+    } finally {
+      setLoadingVllmModels(false);
+    }
+  }, [vllmEmbeddingEndpoint, vllmEmbeddingModel, setVllmEmbeddingModel]);
+
+  useEffect(() => {
+    if (embeddingProvider === "vllm") {
+      const timer = setTimeout(() => {
+        fetchVllmEmbedModels();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [embeddingProvider, fetchVllmEmbedModels]);
+
   // Current active model name for display
   const activeModelLabel = useMemo(() => {
     if (embeddingProvider === "voyage") {
@@ -155,23 +210,28 @@ export default function EmbeddingsSection() {
     if (embeddingProvider === "ollama") {
       return ollamaEmbeddingModel || "Ollama";
     }
+    if (embeddingProvider === "vllm") {
+      return vllmEmbeddingModel || "vLLM";
+    }
     return orEmbeddingModels.find((m) => m.id === openrouterEmbeddingModel)?.name ?? openrouterEmbeddingModel;
-  }, [embeddingProvider, voyageModel, openrouterEmbeddingModel, ollamaEmbeddingModel, orEmbeddingModels]);
+  }, [embeddingProvider, voyageModel, openrouterEmbeddingModel, ollamaEmbeddingModel, vllmEmbeddingModel, orEmbeddingModels]);
 
   // Can generate?
   const canGenerate = useMemo(() => {
     if (editedChunks.length === 0) return false;
     if (embeddingProvider === "voyage") return !!voyageApiKey;
     if (embeddingProvider === "ollama") return !!ollamaEmbeddingModel;
+    if (embeddingProvider === "vllm") return !!vllmEmbeddingModel;
     return !!openrouterApiKey;
-  }, [embeddingProvider, voyageApiKey, openrouterApiKey, ollamaEmbeddingModel, editedChunks.length]);
+  }, [embeddingProvider, voyageApiKey, openrouterApiKey, ollamaEmbeddingModel, vllmEmbeddingModel, editedChunks.length]);
 
   // The embedding model key for metadata
   const embeddingModelKey = useMemo(() => {
     if (embeddingProvider === "voyage") return voyageModel;
     if (embeddingProvider === "ollama") return ollamaEmbeddingModel;
+    if (embeddingProvider === "vllm") return vllmEmbeddingModel;
     return openrouterEmbeddingModel;
-  }, [embeddingProvider, voyageModel, openrouterEmbeddingModel, ollamaEmbeddingModel]);
+  }, [embeddingProvider, voyageModel, openrouterEmbeddingModel, ollamaEmbeddingModel, vllmEmbeddingModel]);
 
   // Generate embeddings
   const handleGenerate = useCallback(async () => {
@@ -200,6 +260,17 @@ export default function EmbeddingsSection() {
           dims,
         );
         setEmbeddingsData(embeddings);
+      } else if (embeddingProvider === "vllm") {
+        const { generateVllmEmbeddings } = await import("@/app/lib/vllm");
+        const dims = embeddingDimensions > 0 ? embeddingDimensions : undefined;
+        const embeddings = await generateVllmEmbeddings(
+          vllmEmbeddingModel,
+          editedChunks,
+          vllmEmbeddingEndpoint,
+          undefined, // batchSize
+          dims,
+        );
+        setEmbeddingsData(embeddings);
       } else {
         const { generateOpenRouterEmbeddings } = await import("@/app/lib/openrouter");
         const dims = embeddingDimensions > 0 ? embeddingDimensions : undefined;
@@ -222,6 +293,7 @@ export default function EmbeddingsSection() {
     voyageApiKey, voyageModel,
     openrouterApiKey, openrouterEmbeddingModel,
     ollamaEmbeddingModel, ollamaEmbeddingEndpoint,
+    vllmEmbeddingModel, vllmEmbeddingEndpoint,
     embeddingDimensions,
     editedChunks,
     setIsEmbedding, setEmbeddingError, setEmbeddingsData,
@@ -301,6 +373,16 @@ export default function EmbeddingsSection() {
             }`}
           >
             Ollama
+          </button>
+          <button
+            onClick={() => setEmbeddingProvider("vllm")}
+            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
+              embeddingProvider === "vllm"
+                ? "bg-sandy text-white border-sandy"
+                : "bg-white text-gunmetal border-silver hover:border-sandy"
+            }`}
+          >
+            vLLM
           </button>
         </div>
       </div>
@@ -471,11 +553,115 @@ export default function EmbeddingsSection() {
         </>
       )}
 
+      {/* ── vLLM Embeddings ── */}
+      {embeddingProvider === "vllm" && (
+        <>
+          {/* Endpoint */}
+          <div>
+            <label className="block text-sm font-medium text-gunmetal mb-1">
+              vLLM Embedding Endpoint
+            </label>
+            <input
+              type="text"
+              value={vllmEmbeddingEndpoint}
+              onChange={(e) => setVllmEmbeddingEndpoint(e.target.value)}
+              placeholder="http://localhost:8001"
+              className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+            />
+          </div>
+
+          {/* Model */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gunmetal">
+                Embedding Model
+                {loadingVllmModels && (
+                  <span className="ml-2 text-xs text-silver-dark animate-pulse">
+                    Loading…
+                  </span>
+                )}
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={fetchVllmEmbedModels}
+                  disabled={loadingVllmModels}
+                  className="text-xs text-sandy hover:text-sandy-dark cursor-pointer disabled:opacity-50"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {vllmModelError && (
+              <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-700">
+                {vllmModelError}
+              </div>
+            )}
+
+            {vllmEmbedModels.length > 0 ? (
+              <select
+                value={vllmEmbeddingModel}
+                onChange={(e) => setVllmEmbeddingModel(e.target.value)}
+                className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none"
+              >
+                {vllmEmbedModels.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.id} {m.max_model_len ? `(ctx: ${m.max_model_len})` : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              !loadingVllmModels && !vllmModelError && (
+                <div className="rounded-lg bg-slate-50 border border-silver p-3 text-xs text-silver-dark italic">
+                  No models detected at this endpoint.
+                </div>
+              )
+            )}
+            
+            <div className="mt-2">
+              <button
+                onClick={() => setShowVllmExample(!showVllmExample)}
+                className="text-[10px] text-sandy hover:underline cursor-pointer"
+              >
+                {showVllmExample ? "Hide example command" : "Show example command"}
+              </button>
+              {showVllmExample && (
+                <div className="mt-1 p-2 bg-slate-900 rounded text-[10px] font-mono text-slate-300 break-all select-all">
+                  vllm serve {vllmEmbeddingModel || "jinaai/jina-embeddings-v3"} --port {vllmEmbeddingEndpoint ? new URL(vllmEmbeddingEndpoint).port : "8001"}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* ── Shared Output Dimensions ── */}
       <div>
-        <label className="block text-sm font-medium text-gunmetal mb-1">
-          Output Dimensions
-        </label>
+        <div className="flex items-center gap-1.5 mb-1">
+          <label className="block text-sm font-medium text-gunmetal">
+            Output Dimensions
+          </label>
+          <div className="group relative">
+            <svg
+              className="h-3.5 w-3.5 text-amber-500 cursor-help"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 w-48 scale-0 group-hover:scale-100 transition-all duration-200 origin-left z-10">
+              <div className="bg-gunmetal text-white text-[10px] rounded p-2 shadow-lg border border-white/10">
+                Verify model support for custom dimensions.
+              </div>
+            </div>
+          </div>
+        </div>
         <input
           type="number"
           min={0}
@@ -518,7 +704,7 @@ export default function EmbeddingsSection() {
           <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
             Generated {embeddingsData.length} embeddings (
             {embeddingsData[0]?.length ?? 0} dimensions each) using{" "}
-            {embeddingProvider === "voyage" ? "Voyage AI" : embeddingProvider === "ollama" ? "Ollama" : "OpenRouter"}.
+            {embeddingProvider === "voyage" ? "Voyage AI" : embeddingProvider === "ollama" ? "Ollama" : embeddingProvider === "vllm" ? "vLLM" : "OpenRouter"}.
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -99,13 +99,17 @@ export interface ParseOptions {
   ollamaEndpoint?: string;
   ollamaModel?: string;
   ollamaPrompt?: string;
+  // vLLM-specific
+  vllmEndpoint?: string;
+  vllmModel?: string;
+  vllmPrompt?: string;
   // Excel-specific
   excelColumn?: string;
   excelSheet?: string;
   // Progress, cancellation & streaming
   onProgress?: ProgressCallback;
   signal?: AbortSignal;
-  /** Real-time token stream for Ollama PDF vision processing */
+  /** Real-time token stream for Ollama/vLLM PDF vision processing */
   onPageStream?: PageStreamCallback;
 }
 
@@ -215,6 +219,53 @@ export async function parseDocument(opts: ParseOptions): Promise<ParseResult> {
         opts.ollamaPrompt!,
         opts.ollamaEndpoint,
         opts.signal,
+      );
+      return { content };
+    }
+
+    // ── vLLM PDF (Vision) ──────────────────────────────────────
+    case PIPELINE.VLLM_PDF: {
+      const { processPdfWithVllm } = await import("./vllm");
+      const content = await processPdfWithVllm(
+        opts.vllmModel!,
+        opts.file,
+        opts.vllmPrompt!,
+        opts.onProgress,
+        opts.signal,
+        opts.vllmEndpoint,
+        opts.onPageStream,
+      );
+      return { content };
+    }
+
+    // ── vLLM Image (Vision) ────────────────────────────────────
+    case PIPELINE.VLLM_IMAGE: {
+      const { chatVllm } = await import("./vllm");
+      
+      // Convert image to data URL
+      const reader = new FileReader();
+      const dataUrlPromise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(opts.file);
+      });
+      const dataUrl = await dataUrlPromise;
+
+      const content = await chatVllm(
+        opts.vllmModel!,
+        [{
+          role: "user",
+          content: [
+            { type: "text", text: opts.vllmPrompt! },
+            { type: "image_url", image_url: { url: dataUrl } },
+          ],
+        }],
+        opts.vllmEndpoint,
+        opts.signal,
+        {
+          max_tokens: 4096,
+          temperature: 0.2,
+        }
       );
       return { content };
     }

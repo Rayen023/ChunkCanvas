@@ -6,8 +6,11 @@ import { DEFAULT_VLLM_ENDPOINT } from "@/app/lib/constants";
 export default function VllmStatus() {
   const [endpoint, setEndpoint] = useState(DEFAULT_VLLM_ENDPOINT);
   const [status, setStatus] = useState<"idle" | "ok" | "error">("idle");
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<{ id: string; max_model_len?: number }[]>([]);
   const [checking, setChecking] = useState(false);
+  const [showExample, setShowExample] = useState(false);
+
+  const exampleCommand = `vllm serve ${models[0]?.id || "model_name"} --port ${endpoint ? new URL(endpoint).port : "8000"}`;
 
   const check = useCallback(async () => {
     setChecking(true);
@@ -30,7 +33,10 @@ export default function VllmStatus() {
             const json = await modelsRes.json();
             setModels(
               (json.data ?? []).map(
-                (m: { id: string }) => m.id,
+                (m: { id: string; max_model_len?: number }) => ({
+                  id: m.id,
+                  max_model_len: m.max_model_len,
+                }),
               ),
             );
           }
@@ -51,7 +57,10 @@ export default function VllmStatus() {
       if (modelsRes.ok) {
         const json = await modelsRes.json();
         setModels(
-          (json.data ?? []).map((m: { id: string }) => m.id),
+          (json.data ?? []).map((m: { id: string; max_model_len?: number }) => ({
+            id: m.id,
+            max_model_len: m.max_model_len,
+          })),
         );
         setStatus("ok");
       } else {
@@ -93,6 +102,19 @@ export default function VllmStatus() {
           onChange={(e) => setEndpoint(e.target.value)}
           className="w-full rounded-lg border border-silver px-3 py-1.5 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
         />
+        <div className="mt-1">
+          <button
+            onClick={() => setShowExample(!showExample)}
+            className="text-[10px] text-sandy hover:underline cursor-pointer"
+          >
+            {showExample ? "Hide example command" : "Show example command"}
+          </button>
+          {showExample && (
+            <div className="mt-1 p-2 bg-slate-900 rounded text-[10px] font-mono text-slate-300 break-all select-all">
+              {exampleCommand}
+            </div>
+          )}
+        </div>
         <button
           onClick={check}
           disabled={checking}
@@ -107,7 +129,9 @@ export default function VllmStatus() {
             {models.length > 0 && (
               <ul className="mt-1 ml-4 list-disc">
                 {models.map((m) => (
-                  <li key={m}>{m}</li>
+                  <li key={m.id}>
+                    {m.id} {m.max_model_len ? `(ctx: ${m.max_model_len})` : ""}
+                  </li>
                 ))}
               </ul>
             )}

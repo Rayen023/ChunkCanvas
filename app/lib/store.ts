@@ -3,7 +3,7 @@
  */
 import { create } from "zustand";
 import type { ChunkingParams, EmbeddingProvider, PdfEngine } from "./types";
-import { DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP, DEFAULT_SEPARATORS, DEFAULT_OLLAMA_ENDPOINT, DEFAULT_EMBEDDING_DIMENSIONS } from "./constants";
+import { DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP, DEFAULT_SEPARATORS, DEFAULT_OLLAMA_ENDPOINT, DEFAULT_EMBEDDING_DIMENSIONS, DEFAULT_VLLM_ENDPOINT, DEFAULT_VLLM_EMBEDDING_ENDPOINT } from "./constants";
 
 export interface AppState {
   // ── Step 1 ────────────────────────────────────
@@ -25,6 +25,11 @@ export interface AppState {
   ollamaEndpoint: string;
   ollamaModel: string;
   ollamaPrompt: string;
+
+  // vLLM parsing
+  vllmEndpoint: string;
+  vllmModel: string;
+  vllmPrompt: string;
 
   // ── Step 3 — parsed result ────────────────────
   parsedContent: string | null;
@@ -53,6 +58,8 @@ export interface AppState {
   embeddingDimensions: number;
   ollamaEmbeddingModel: string;
   ollamaEmbeddingEndpoint: string;
+  vllmEmbeddingModel: string;
+  vllmEmbeddingEndpoint: string;
   embeddingsData: number[][] | null;
   isEmbedding: boolean;
   embeddingError: string | null;
@@ -105,6 +112,11 @@ export interface AppActions {
   setOllamaModel: (model: string) => void;
   setOllamaPrompt: (prompt: string) => void;
 
+  // vLLM parsing
+  setVllmEndpoint: (ep: string) => void;
+  setVllmModel: (model: string) => void;
+  setVllmPrompt: (prompt: string) => void;
+
   // Step 3
   setParsedContent: (content: string | null) => void;
   setParsedFilename: (name: string) => void;
@@ -131,6 +143,8 @@ export interface AppActions {
   setEmbeddingDimensions: (dims: number) => void;
   setOllamaEmbeddingModel: (model: string) => void;
   setOllamaEmbeddingEndpoint: (ep: string) => void;
+  setVllmEmbeddingModel: (model: string) => void;
+  setVllmEmbeddingEndpoint: (ep: string) => void;
   setEmbeddingsData: (data: number[][] | null) => void;
   setIsEmbedding: (v: boolean) => void;
   setEmbeddingError: (err: string | null) => void;
@@ -186,6 +200,11 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   ollamaModel: "",
   ollamaPrompt: "",
 
+  // vLLM parsing
+  vllmEndpoint: DEFAULT_VLLM_ENDPOINT,
+  vllmModel: "",
+  vllmPrompt: "",
+
   parsedContent: null,
   parsedFilename: "",
   parsedDocType: "",
@@ -208,6 +227,8 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   embeddingDimensions: DEFAULT_EMBEDDING_DIMENSIONS,
   ollamaEmbeddingModel: "",
   ollamaEmbeddingEndpoint: DEFAULT_OLLAMA_ENDPOINT,
+  vllmEmbeddingModel: "jinaai/jina-embeddings-v3",
+  vllmEmbeddingEndpoint: DEFAULT_VLLM_EMBEDDING_ENDPOINT,
   embeddingsData: null,
   isEmbedding: false,
   embeddingError: null,
@@ -249,6 +270,10 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   setOllamaEndpoint: (ep) => set({ ollamaEndpoint: ep }),
   setOllamaModel: (model) => set({ ollamaModel: model }),
   setOllamaPrompt: (prompt) => set({ ollamaPrompt: prompt }),
+
+  setVllmEndpoint: (ep) => set({ vllmEndpoint: ep }),
+  setVllmModel: (model) => set({ vllmModel: model }),
+  setVllmPrompt: (prompt) => set({ vllmPrompt: prompt }),
 
   setParsedContent: (content) => set({ parsedContent: content }),
   setParsedFilename: (name) => set({ parsedFilename: name }),
@@ -296,6 +321,8 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   setEmbeddingDimensions: (dims) => set({ embeddingDimensions: dims }),
   setOllamaEmbeddingModel: (model) => set({ ollamaEmbeddingModel: model }),
   setOllamaEmbeddingEndpoint: (ep) => set({ ollamaEmbeddingEndpoint: ep }),
+  setVllmEmbeddingModel: (model) => set({ vllmEmbeddingModel: model }),
+  setVllmEmbeddingEndpoint: (ep) => set({ vllmEmbeddingEndpoint: ep }),
   setEmbeddingsData: (data) => set({ embeddingsData: data }),
   setIsEmbedding: (v) => set({ isEmbedding: v }),
   setEmbeddingError: (err) => set({ embeddingError: err }),
@@ -344,6 +371,9 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
       ollamaEndpoint: DEFAULT_OLLAMA_ENDPOINT,
       ollamaModel: "",
       ollamaPrompt: "",
+      vllmEndpoint: DEFAULT_VLLM_ENDPOINT,
+      vllmModel: "",
+      vllmPrompt: "",
       parsedContent: null,
       parsedFilename: "",
       parsedDocType: "",
@@ -366,6 +396,8 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
       embeddingDimensions: DEFAULT_EMBEDDING_DIMENSIONS,
       ollamaEmbeddingModel: "",
       ollamaEmbeddingEndpoint: DEFAULT_OLLAMA_ENDPOINT,
+      vllmEmbeddingModel: "",
+      vllmEmbeddingEndpoint: DEFAULT_VLLM_EMBEDDING_ENDPOINT,
       embeddingsData: null,
       isEmbedding: false,
       embeddingError: null,

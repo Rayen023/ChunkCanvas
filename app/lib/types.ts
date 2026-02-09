@@ -10,6 +10,8 @@ export const PIPELINE = {
   OPENROUTER_VIDEO: "OpenRouter — Video Parsing (Multimodal LLM)",
   OLLAMA_PDF: "Ollama — PDF Parsing (Local Vision LLM)",
   OLLAMA_IMAGE: "Ollama — Image Parsing (Local Vision LLM)",
+  VLLM_PDF: "vLLM — PDF Parsing (Local Vision LLM)",
+  VLLM_IMAGE: "vLLM — Image Parsing (Local Vision LLM)",
 } as const;
 
 export type PipelineName = (typeof PIPELINE)[keyof typeof PIPELINE];
@@ -25,6 +27,8 @@ export const PIPELINE_MODALITY: Record<string, Modality> = {
   [PIPELINE.OPENROUTER_VIDEO]: "video",
   [PIPELINE.OLLAMA_PDF]: "file",
   [PIPELINE.OLLAMA_IMAGE]: "image",
+  [PIPELINE.VLLM_PDF]: "file",
+  [PIPELINE.VLLM_IMAGE]: "image",
 };
 
 // ─── OpenRouter Model ─────────────────────────────────────────────────────
@@ -49,7 +53,7 @@ export interface OpenRouterModelFull extends OpenRouterModel {
 
 // ─── Embedding Provider ──────────────────────────────────────────────────
 
-export type EmbeddingProvider = "voyage" | "openrouter" | "ollama";
+export type EmbeddingProvider = "voyage" | "openrouter" | "ollama" | "vllm";
 
 // ─── PDF Engine ───────────────────────────────────────────────────────────
 

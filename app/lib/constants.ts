@@ -37,6 +37,10 @@ export const PIPELINE_ALLOWED_EXTENSIONS: Record<string, Set<string>> = {
   [PIPELINE.OLLAMA_IMAGE]: new Set([
     "png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif",
   ]),
+  [PIPELINE.VLLM_PDF]: new Set(["pdf"]),
+  [PIPELINE.VLLM_IMAGE]: new Set([
+    "png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif",
+  ]),
 };
 
 /** Every extension the app accepts */
@@ -188,7 +192,8 @@ export const DEFAULT_SEPARATORS_DISPLAY = "\\n\\n, \\n# , \\n## , \\n### , \\n--
 
 // ─── vLLM ─────────────────────────────────────────────────────────────────
 
-export const DEFAULT_VLLM_ENDPOINT = "http://localhost:8734";
+export const DEFAULT_VLLM_ENDPOINT = "http://localhost:8000";
+export const DEFAULT_VLLM_EMBEDDING_ENDPOINT = "http://localhost:8001";
 
 // ─── Ollama ───────────────────────────────────────────────────────────────
 

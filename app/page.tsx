@@ -21,6 +21,10 @@ const OllamaForm = dynamic(
   () => import("./components/pipeline-forms/OllamaForm"),
   { loading: () => <FormSkeleton /> },
 );
+const VllmForm = dynamic(
+  () => import("./components/pipeline-forms/VllmForm"),
+  { loading: () => <FormSkeleton /> },
+);
 const ParsedDocumentView = dynamic(
   () => import("./components/parsing/ParsedDocumentView"),
 );
@@ -136,6 +140,7 @@ export default function Home() {
 
   const isOpenRouter = pipeline.startsWith("OpenRouter");
   const isOllama = pipeline.startsWith("Ollama");
+  const isVllm = pipeline.startsWith("vLLM");
   const showForm = !!pipeline;
   const canProcess =
     !!file &&
@@ -168,9 +173,9 @@ export default function Home() {
     state.setParseProgress(0, "Initializing...");
     state.resetDownstream(3);
 
-    // For Ollama PDF, show the document view immediately with streaming text
-    const isOllamaPdf = state.pipeline === PIPELINE.OLLAMA_PDF;
-    if (isOllamaPdf) {
+    // For local PDF parsing, show the document view immediately with streaming text
+    const isLocalPdf = state.pipeline === PIPELINE.OLLAMA_PDF || state.pipeline === PIPELINE.VLLM_PDF;
+    if (isLocalPdf) {
       state.setParsedContent(""); // show Step 3 right away
     }
 
@@ -192,11 +197,14 @@ export default function Home() {
         ollamaEndpoint: state.ollamaEndpoint,
         ollamaModel: state.ollamaModel,
         ollamaPrompt: state.ollamaPrompt,
+        vllmEndpoint: state.vllmEndpoint,
+        vllmModel: state.vllmModel,
+        vllmPrompt: state.vllmPrompt,
         excelColumn: state.excelColumn,
         excelSheet: state.excelSheet,
         onProgress: (pct, msg) => state.setParseProgress(pct, msg),
         signal: controller.signal,
-        onPageStream: isOllamaPdf
+        onPageStream: isLocalPdf
           ? (pageNum, _token, fullPage) => {
               streamingPages.set(pageNum, fullPage);
               // Assemble all pages in order
@@ -297,6 +305,7 @@ export default function Home() {
           {/* Pipeline-specific form */}
           {isOpenRouter && <OpenRouterForm />}
           {isOllama && <OllamaForm />}
+          {isVllm && <VllmForm />}
           {(pipeline === PIPELINE.EXCEL_SPREADSHEET ||
             pipeline === PIPELINE.CSV_SPREADSHEET) && <ExcelForm />}
           {pipeline === PIPELINE.SIMPLE_TEXT && (
