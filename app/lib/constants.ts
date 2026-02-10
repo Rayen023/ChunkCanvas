@@ -44,6 +44,9 @@ export const PIPELINE_ALLOWED_EXTENSIONS: Record<string, Set<string>> = {
   [PIPELINE.VLLM_AUDIO]: new Set([
     "wav", "mp3", "aiff", "aac", "ogg", "flac", "m4a",
   ]),
+  [PIPELINE.VLLM_VIDEO]: new Set([
+    "mp4", "mpeg", "mov", "webm", "mkv", "avi",
+  ]),
 };
 
 /** Every extension the app accepts */

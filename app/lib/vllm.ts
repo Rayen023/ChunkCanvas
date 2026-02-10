@@ -73,11 +73,12 @@ interface VllmChatMessage {
   content: string | (
     | { type: "text"; text: string }
     | { type: "image_url"; image_url: { url: string } }
+    | { type: "video_url"; video_url: { url: string } }
   )[];
 }
 
 /**
- * Send a chat request to vLLM with optional images.
+ * Send a chat request to vLLM with optional images or video.
  * Uses streaming mode (Server-Sent Events).
  */
 export async function chatVllm(
@@ -270,6 +271,58 @@ ${text}`;
   }
 
   return pageTexts.filter(Boolean).join("\n\n");
+}
+
+// ─── Video Processing ─────────────────────────────────────────────────────
+
+export async function processVideoWithVllm(
+  model: string,
+  file: File,
+  prompt: string,
+  endpoint: string = DEFAULT_VLLM_ENDPOINT,
+  signal?: AbortSignal,
+  onProgress?: ProgressCallback,
+): Promise<string> {
+  const MAX_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB hard limit
+
+  if (file.size === 0) throw new Error(`Video file "${file.name}" is empty`);
+  if (file.size > MAX_SIZE_BYTES) {
+    throw new Error(`Video file too large (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+  }
+
+  onProgress?.(10, "Encoding video…");
+
+  const { VIDEO_MIME } = await import("./constants");
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const mime = VIDEO_MIME[ext] ?? "video/mp4";
+
+  // Use the same helper as elsewhere for base64 conversion
+  const reader = new FileReader();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  onProgress?.(50, "Sending to vLLM…");
+
+  const messages: VllmChatMessage[] = [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: prompt },
+        { type: "video_url", video_url: { url: dataUrl } },
+      ],
+    },
+  ];
+
+  return chatVllm(
+    model,
+    messages,
+    endpoint,
+    signal,
+    { max_tokens: 4096, temperature: 0.2 }
+  );
 }
 
 // ─── Embeddings ───────────────────────────────────────────────────────────

@@ -66,6 +66,8 @@ export default function VllmForm() {
 
   const exampleCommand = modality === "audio"
     ? `vllm serve ${model || "openai/whisper-large-v3"} --port ${endpoint ? new URL(endpoint).port : "8000"}`
+    : modality === "video"
+    ? `vllm serve ${model || "llava-hf/LLaVA-NeXT-Video-7B-hf"} --port ${endpoint ? new URL(endpoint).port : "8000"}`
     : `vllm serve ${model || "Qwen3-VL-8B-Instruct-FP8"} --port ${endpoint ? new URL(endpoint).port : "8000"}`;
 
   return (

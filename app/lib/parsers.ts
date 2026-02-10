@@ -283,6 +283,20 @@ export async function parseDocument(opts: ParseOptions): Promise<ParseResult> {
       return { content };
     }
 
+    // ── vLLM Video (Understanding) ─────────────────────────────
+    case PIPELINE.VLLM_VIDEO: {
+      const { processVideoWithVllm } = await import("./vllm");
+      const content = await processVideoWithVllm(
+        opts.vllmModel!,
+        opts.file,
+        opts.vllmPrompt!,
+        opts.vllmEndpoint,
+        opts.signal,
+        opts.onProgress,
+      );
+      return { content };
+    }
+
     default:
       throw new Error(`Unsupported pipeline: ${opts.pipeline}`);
   }
