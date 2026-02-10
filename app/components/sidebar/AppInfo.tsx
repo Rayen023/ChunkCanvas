@@ -51,7 +51,7 @@ const STEPS = [
 
 /* ─── Compute the current active step from store state ────── */
 function useActiveStep(): number {
-  const file = useAppStore((s) => s.file);
+  const files = useAppStore((s) => s.files);
   const pipeline = useAppStore((s) => s.pipeline);
   const parsedContent = useAppStore((s) => s.parsedContent);
   const editedChunks = useAppStore((s) => s.editedChunks);
@@ -68,7 +68,7 @@ function useActiveStep(): number {
 
   // Before chunks
   if (parsedContent) return 3;
-  if (file && pipeline) return 2;
+  if (files.length > 0 && pipeline) return 2;
   return 1;
 }
 

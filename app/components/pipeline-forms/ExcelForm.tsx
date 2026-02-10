@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useAppStore } from "@/app/lib/store";
 
 export default function ExcelForm() {
-  const file = useAppStore((s) => s.file);
+  const files = useAppStore((s) => s.files);
+  const file = files[0] ?? null;
   const excelSheet = useAppStore((s) => s.excelSheet);
   const excelSheets = useAppStore((s) => s.excelSheets);
   const excelColumn = useAppStore((s) => s.excelColumn);

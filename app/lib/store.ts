@@ -2,12 +2,12 @@
  * Central Zustand store — single source of truth for the entire app.
  */
 import { create } from "zustand";
-import type { ChunkingParams, EmbeddingProvider, PdfEngine } from "./types";
+import type { ChunkingParams, EmbeddingProvider, PdfEngine, ParsedFileResult, PineconeFieldMapping } from "./types";
 import { DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP, DEFAULT_SEPARATORS, DEFAULT_OLLAMA_ENDPOINT, DEFAULT_EMBEDDING_DIMENSIONS, DEFAULT_VLLM_ENDPOINT, DEFAULT_VLLM_EMBEDDING_ENDPOINT } from "./constants";
 
 export interface AppState {
   // ── Step 1 ────────────────────────────────────
-  file: File | null;
+  files: File[];
   pipeline: string;
 
   // ── Step 2 — pipeline form data ───────────────
@@ -43,11 +43,16 @@ export interface AppState {
   parseProgressMsg: string;
   parseError: string | null;
 
+  // ── Multi-file tracking ───────────────────────
+  parsedResults: ParsedFileResult[];
+  currentProcessingFile: string;
+
   // ── Step 3b — chunking ────────────────────────
   chunkingParams: ChunkingParams;
 
   // ── Step 4 — editable chunks ──────────────────
   editedChunks: string[];
+  chunkSourceFiles: string[];
   isChunking: boolean;
 
   // ── Step 6 — embeddings ───────────────────────
@@ -71,6 +76,7 @@ export interface AppState {
   pineconeIndexes: string[];
   pineconeNamespace: string;
   pineconeNamespaces: string[];
+  pineconeFieldMapping: PineconeFieldMapping;
   isUploadingPinecone: boolean;
   pineconeError: string | null;
   pineconeSuccess: string | null;
@@ -93,7 +99,9 @@ export interface AppState {
 
 export interface AppActions {
   // Step 1
-  setFile: (file: File | null) => void;
+  setFiles: (files: File[]) => void;
+  addFiles: (files: File[]) => void;
+  removeFile: (index: number) => void;
   setPipeline: (pipeline: string) => void;
 
   // Step 2
@@ -125,6 +133,8 @@ export interface AppActions {
   setIsParsing: (v: boolean) => void;
   setParseProgress: (pct: number, msg?: string) => void;
   setParseError: (err: string | null) => void;
+  setParsedResults: (results: ParsedFileResult[]) => void;
+  setCurrentProcessingFile: (name: string) => void;
 
   // Step 3b
   setChunkingParams: (params: Partial<ChunkingParams>) => void;
@@ -134,6 +144,7 @@ export interface AppActions {
   updateChunk: (index: number, text: string) => void;
   deleteChunk: (index: number) => void;
   setIsChunking: (v: boolean) => void;
+  setChunkSourceFiles: (files: string[]) => void;
 
   // Step 6
   setEmbeddingProvider: (provider: EmbeddingProvider) => void;
@@ -156,6 +167,7 @@ export interface AppActions {
   setPineconeIndexes: (indexes: string[]) => void;
   setPineconeNamespace: (ns: string) => void;
   setPineconeNamespaces: (namespaces: string[]) => void;
+  setPineconeFieldMapping: (mapping: Partial<PineconeFieldMapping>) => void;
   setIsUploadingPinecone: (v: boolean) => void;
   setPineconeError: (err: string | null) => void;
   setPineconeSuccess: (msg: string | null) => void;
@@ -183,7 +195,7 @@ export interface AppActions {
 
 export const useAppStore = create<AppState & AppActions>((set, get) => ({
   // ── Initial state ─────────────────────────────────────────
-  file: null,
+  files: [],
   pipeline: "",
   openrouterApiKey: "",
   openrouterModel: "google/gemini-3-flash-preview",
@@ -213,12 +225,15 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   parseProgress: 0,
   parseProgressMsg: "",
   parseError: null,
+  parsedResults: [],
+  currentProcessingFile: "",
   chunkingParams: {
     separators: DEFAULT_SEPARATORS,
     chunkSize: DEFAULT_CHUNK_SIZE,
     chunkOverlap: DEFAULT_CHUNK_OVERLAP,
   },
   editedChunks: [],
+  chunkSourceFiles: [],
   isChunking: false,
   embeddingProvider: "openrouter",
   voyageApiKey: "",
@@ -238,6 +253,7 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   pineconeIndexes: [],
   pineconeNamespace: "",
   pineconeNamespaces: [],
+  pineconeFieldMapping: { idPrefix: "", textField: "text", filenameField: "filename" },
   isUploadingPinecone: false,
   pineconeError: null,
   pineconeSuccess: null,
@@ -248,9 +264,20 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   envKeys: { openrouter: "", voyage: "", pinecone: "" },
 
   // ── Actions ───────────────────────────────────────────────
-  setFile: (file) => {
-    set({ file, pipeline: "" });
+  setFiles: (files) => {
+    set({ files, pipeline: "" });
     get().resetDownstream(1);
+  },
+  addFiles: (newFiles) => {
+    set((s) => ({ files: [...s.files, ...newFiles] }));
+    get().resetDownstream(2);
+  },
+  removeFile: (index) => {
+    set((s) => {
+      const next = s.files.filter((_, i) => i !== index);
+      return { files: next, ...(next.length === 0 ? { pipeline: "" } : {}) };
+    });
+    get().resetDownstream(2);
   },
   setPipeline: (pipeline) => {
     set({ pipeline });
@@ -283,6 +310,8 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   setParseProgress: (pct, msg) =>
     set({ parseProgress: pct, parseProgressMsg: msg ?? "" }),
   setParseError: (err) => set({ parseError: err }),
+  setParsedResults: (results) => set({ parsedResults: results }),
+  setCurrentProcessingFile: (name) => set({ currentProcessingFile: name }),
 
   setChunkingParams: (params) =>
     set((s) => ({
@@ -313,6 +342,7 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
       pineconeError: null,
     })),
   setIsChunking: (v) => set({ isChunking: v }),
+  setChunkSourceFiles: (files) => set({ chunkSourceFiles: files }),
 
   setEmbeddingProvider: (provider) => set({ embeddingProvider: provider, embeddingsData: null, embeddingError: null }),
   setVoyageApiKey: (key) => set({ voyageApiKey: key }),
@@ -333,6 +363,10 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   setPineconeIndexes: (indexes) => set({ pineconeIndexes: indexes }),
   setPineconeNamespace: (ns) => set({ pineconeNamespace: ns }),
   setPineconeNamespaces: (namespaces) => set({ pineconeNamespaces: namespaces }),
+  setPineconeFieldMapping: (mapping) =>
+    set((s) => ({
+      pineconeFieldMapping: { ...s.pineconeFieldMapping, ...mapping },
+    })),
   setIsUploadingPinecone: (v) => set({ isUploadingPinecone: v }),
   setPineconeError: (err) => set({ pineconeError: err }),
   setPineconeSuccess: (msg) => set({ pineconeSuccess: msg }),
@@ -358,7 +392,7 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
   resetAll: () => {
     const s = get();
     set({
-      file: null,
+      files: [],
       pipeline: "",
       openrouterApiKey: s.envKeys.openrouter || "",
       openrouterModel: "google/gemini-3-flash-preview",
@@ -378,6 +412,8 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
       parsedFilename: "",
       parsedDocType: "",
       parsedExcelRows: null,
+      parsedResults: [],
+      currentProcessingFile: "",
       isParsing: false,
       parseProgress: 0,
       parseProgressMsg: "",
@@ -388,6 +424,7 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
         chunkOverlap: DEFAULT_CHUNK_OVERLAP,
       },
       editedChunks: [],
+      chunkSourceFiles: [],
       isChunking: false,
       embeddingProvider: "openrouter",
       voyageApiKey: s.envKeys.voyage || "",
@@ -407,6 +444,7 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
       pineconeIndexes: [],
       pineconeNamespace: "",
       pineconeNamespaces: [],
+      pineconeFieldMapping: { idPrefix: "", textField: "text", filenameField: "filename" },
       isUploadingPinecone: false,
       pineconeError: null,
       pineconeSuccess: null,
@@ -425,9 +463,12 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
       resets.parsedExcelRows = null;
       resets.parseError = null;
       resets.parseProgress = 0;
+      resets.parsedResults = [];
+      resets.currentProcessingFile = "";
     }
     if (fromStep <= 3) {
       resets.editedChunks = [];
+      resets.chunkSourceFiles = [];
     }
     if (fromStep <= 4) {
       resets.embeddingsData = null;

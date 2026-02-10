@@ -59,7 +59,7 @@ function FormSkeleton() {
 }
 
 export default function Home() {
-  const file = useAppStore((s) => s.file);
+  const files = useAppStore((s) => s.files);
   const pipeline = useAppStore((s) => s.pipeline);
   const parsedContent = useAppStore((s) => s.parsedContent);
   const editedChunks = useAppStore((s) => s.editedChunks);
@@ -143,7 +143,7 @@ export default function Home() {
   const isVllm = pipeline.startsWith("vLLM");
   const showForm = !!pipeline;
   const canProcess =
-    !!file &&
+    files.length > 0 &&
     !!pipeline &&
     !isParsing &&
     (isOpenRouter ? !!openrouterApiKey : true);
@@ -158,10 +158,10 @@ export default function Home() {
     }
   }, []);
 
-  // ── Process Document ────────────────────────────────────────
+  // ── Process Document(s) — sequential multi-file ──────────
   const handleProcess = useCallback(async () => {
     const state = useAppStore.getState();
-    if (!state.file || !state.pipeline) return;
+    if (state.files.length === 0 || !state.pipeline) return;
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -172,67 +172,130 @@ export default function Home() {
     state.setParseError(null);
     state.setParseProgress(0, "Initializing...");
     state.resetDownstream(3);
+    state.setParsedResults([]);
 
-    // For local PDF parsing, show the document view immediately with streaming text
     const isLocalPdf = state.pipeline === PIPELINE.OLLAMA_PDF || state.pipeline === PIPELINE.VLLM_PDF;
     if (isLocalPdf) {
-      state.setParsedContent(""); // show Step 3 right away
+      state.setParsedContent("");
     }
 
-    // Accumulator for real-time page streaming — each page builds its own
-    // text independently, then we assemble the full document on each token.
-    const streamingPages: Map<number, string> = new Map();
+    const { parseDocument } = await import("@/app/lib/parsers");
+    const parsedResults: { filename: string; content: string; excelRows?: string[] }[] = [];
+    const totalFiles = state.files.length;
 
-    try {
-      const { parseDocument } = await import("@/app/lib/parsers");
+    for (let fileIdx = 0; fileIdx < totalFiles; fileIdx++) {
+      if (controller.signal.aborted) break;
 
-      const result = await parseDocument({
-        pipeline: state.pipeline,
-        file: state.file,
-        openrouterApiKey: state.openrouterApiKey,
-        openrouterModel: state.openrouterModel,
-        openrouterPrompt: state.openrouterPrompt,
-        openrouterPagesPerBatch: state.openrouterPagesPerBatch,
-        pdfEngine: state.pdfEngine,
-        ollamaEndpoint: state.ollamaEndpoint,
-        ollamaModel: state.ollamaModel,
-        ollamaPrompt: state.ollamaPrompt,
-        vllmEndpoint: state.vllmEndpoint,
-        vllmModel: state.vllmModel,
-        vllmPrompt: state.vllmPrompt,
-        excelColumn: state.excelColumn,
-        excelSheet: state.excelSheet,
-        onProgress: (pct, msg) => state.setParseProgress(pct, msg),
-        signal: controller.signal,
-        onPageStream: isLocalPdf
-          ? (pageNum, _token, fullPage) => {
-              streamingPages.set(pageNum, fullPage);
-              // Assemble all pages in order
-              const sorted = Array.from(streamingPages.entries())
-                .sort(([a], [b]) => a - b)
-                .map(([num, text]) => `--- Page ${num} ---\n${text}`);
-              state.setParsedContent(sorted.join("\n\n"));
-            }
-          : undefined,
-      });
+      const currentFile = state.files[fileIdx];
+      state.setCurrentProcessingFile(currentFile.name);
+      const baseProgress = (fileIdx / totalFiles) * 100;
+      const fileProgressRange = 100 / totalFiles;
 
-      state.setParsedContent(result.content);
-      state.setParsedFilename(state.file.name);
-      state.setParsedDocType(state.pipeline);
-      if (result.excelRows) state.setParsedExcelRows(result.excelRows);
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        state.setParseError(err instanceof Error ? err.message : String(err));
+      state.setParseProgress(
+        baseProgress,
+        `[${fileIdx + 1}/${totalFiles}] ${currentFile.name}`,
+      );
+
+      const streamingPages: Map<number, string> = new Map();
+
+      try {
+        const result = await parseDocument({
+          pipeline: state.pipeline,
+          file: currentFile,
+          openrouterApiKey: state.openrouterApiKey,
+          openrouterModel: state.openrouterModel,
+          openrouterPrompt: state.openrouterPrompt,
+          openrouterPagesPerBatch: state.openrouterPagesPerBatch,
+          pdfEngine: state.pdfEngine,
+          ollamaEndpoint: state.ollamaEndpoint,
+          ollamaModel: state.ollamaModel,
+          ollamaPrompt: state.ollamaPrompt,
+          vllmEndpoint: state.vllmEndpoint,
+          vllmModel: state.vllmModel,
+          vllmPrompt: state.vllmPrompt,
+          excelColumn: state.excelColumn,
+          excelSheet: state.excelSheet,
+          onProgress: (pct, msg) => {
+            const adjusted = baseProgress + (pct / 100) * fileProgressRange;
+            state.setParseProgress(
+              adjusted,
+              `[${fileIdx + 1}/${totalFiles}] ${currentFile.name} — ${msg || "Processing…"}`,
+            );
+          },
+          signal: controller.signal,
+          onPageStream: isLocalPdf
+            ? (pageNum, _token, fullPage) => {
+                streamingPages.set(pageNum, fullPage);
+                const sorted = Array.from(streamingPages.entries())
+                  .sort(([a], [b]) => a - b)
+                  .map(([num, text]) => `--- Page ${num} ---\n${text}`);
+                const currentFileContent = sorted.join("\n\n");
+                const allContent = [
+                  ...parsedResults.map((r) =>
+                    totalFiles > 1
+                      ? `\n═══ ${r.filename} ═══\n${r.content}`
+                      : r.content,
+                  ),
+                  totalFiles > 1
+                    ? `\n═══ ${currentFile.name} ═══\n${currentFileContent}`
+                    : currentFileContent,
+                ].join("\n\n");
+                state.setParsedContent(allContent);
+              }
+            : undefined,
+        });
+
+        parsedResults.push({
+          filename: currentFile.name,
+          content: result.content,
+          excelRows: result.excelRows,
+        });
+
+        // Update combined content after each file
+        const combinedContent = parsedResults
+          .map((r) =>
+            totalFiles > 1
+              ? `\n═══ ${r.filename} ═══\n${r.content}`
+              : r.content,
+          )
+          .join("\n\n");
+        state.setParsedContent(combinedContent);
+        state.setParsedResults([...parsedResults]);
+      } catch (err) {
+        if ((err as Error).name === "AbortError") break;
+        state.setParseError(
+          `Error parsing ${currentFile.name}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        break;
       }
-    } finally {
-      state.setIsParsing(false);
     }
+
+    // Final state
+    if (parsedResults.length > 0) {
+      state.setParsedFilename(
+        totalFiles === 1
+          ? parsedResults[0].filename
+          : `${parsedResults.length} files`,
+      );
+      state.setParsedDocType(state.pipeline);
+
+      const allExcelRows = parsedResults
+        .filter((r) => r.excelRows)
+        .flatMap((r) => r.excelRows!);
+      if (allExcelRows.length > 0) {
+        state.setParsedExcelRows(allExcelRows);
+      }
+    }
+
+    state.setIsParsing(false);
+    state.setCurrentProcessingFile("");
   }, []);
 
-  // ── Chunk Document ──────────────────────────────────────────
+  // ── Chunk Document(s) — each file chunked independently ──
   const handleChunk = useCallback(async () => {
     const state = useAppStore.getState();
-    if (!state.parsedContent) return;
+    const results = state.parsedResults;
+    if (results.length === 0 && !state.parsedContent) return;
 
     state.setIsChunking(true);
     state.resetDownstream(4);
@@ -240,26 +303,46 @@ export default function Home() {
     try {
       const { chunkText, chunkExcelRows } = await import("@/app/lib/chunking");
 
-      let chunks: string[];
-      if (
-        (state.pipeline === PIPELINE.EXCEL_SPREADSHEET ||
-          state.pipeline === PIPELINE.CSV_SPREADSHEET) &&
-        state.parsedExcelRows
-      ) {
-        chunks = await chunkExcelRows(
-          state.parsedExcelRows,
-          state.chunkingParams,
-          state.parsedFilename,
-        );
+      const allChunks: string[] = [];
+      const allSourceFiles: string[] = [];
+
+      if (results.length > 0) {
+        // Multi-file: chunk each file independently (ensures file boundaries)
+        for (const result of results) {
+          let fileChunks: string[];
+          if (
+            (state.pipeline === PIPELINE.EXCEL_SPREADSHEET ||
+              state.pipeline === PIPELINE.CSV_SPREADSHEET) &&
+            result.excelRows
+          ) {
+            fileChunks = await chunkExcelRows(
+              result.excelRows,
+              state.chunkingParams,
+              result.filename,
+            );
+          } else {
+            fileChunks = await chunkText(
+              result.content,
+              state.chunkingParams,
+              result.filename,
+            );
+          }
+          allChunks.push(...fileChunks);
+          allSourceFiles.push(...fileChunks.map(() => result.filename));
+        }
       } else {
-        chunks = await chunkText(
-          state.parsedContent,
+        // Fallback: single parsedContent
+        const chunks = await chunkText(
+          state.parsedContent!,
           state.chunkingParams,
           state.parsedFilename,
         );
+        allChunks.push(...chunks);
+        allSourceFiles.push(...chunks.map(() => state.parsedFilename));
       }
 
-      state.setEditedChunks(chunks);
+      state.setEditedChunks(allChunks);
+      state.setChunkSourceFiles(allSourceFiles);
     } catch (err) {
       state.setParseError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -289,7 +372,7 @@ export default function Home() {
         </h2>
 
         <FileUploader />
-        {file && <PipelineSelector />}
+        {files.length > 0 && <PipelineSelector />}
       </section>
 
       {/* ═══════ STEP 2 — Pipeline Config & Process ═══════ */}
@@ -371,7 +454,7 @@ export default function Home() {
               disabled={!canProcess}
               className="w-full flex items-center justify-center gap-2 rounded-lg bg-sandy px-4 py-3 text-sm font-medium text-white hover:bg-sandy-light active:bg-sandy-dark disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
             >
-              Parse Document
+              Parse Document{files.length > 1 ? "s" : ""}
             </button>
           )}
         </section>
@@ -422,7 +505,7 @@ export default function Home() {
                 Chunking…
               </>
             ) : (
-              "Chunk Document"
+              `Chunk Document${files.length > 1 ? "s" : ""}`
             )}
           </button>
         </section>

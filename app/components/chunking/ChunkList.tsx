@@ -6,6 +6,7 @@ import ChunkCard from "./ChunkCard";
 
 export default function ChunkList() {
   const editedChunks = useAppStore((s) => s.editedChunks);
+  const chunkSourceFiles = useAppStore((s) => s.chunkSourceFiles);
   const updateChunk = useAppStore((s) => s.updateChunk);
   const deleteChunk = useAppStore((s) => s.deleteChunk);
   const allChunksCollapsed = useAppStore((s) => s.allChunksCollapsed);
@@ -67,6 +68,7 @@ export default function ChunkList() {
             key={`chunk-${i}`}
             index={i}
             text={text}
+            sourceFile={chunkSourceFiles[i]}
             onUpdate={onUpdate}
             onDelete={onDelete}
             forceCollapsed={allChunksCollapsed}

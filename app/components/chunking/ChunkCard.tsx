@@ -5,12 +5,13 @@ import { useState, useCallback, memo, useMemo, useEffect } from "react";
 interface Props {
   index: number;
   text: string;
+  sourceFile?: string;
   onUpdate: (index: number, text: string) => void;
   onDelete: (index: number) => void;
   forceCollapsed?: boolean;
 }
 
-function ChunkCard({ index, text, onUpdate, onDelete, forceCollapsed }: Props) {
+function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed }: Props) {
   const [localExpanded, setLocalExpanded] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
   const [prevText, setPrevText] = useState(text);
@@ -86,6 +87,11 @@ function ChunkCard({ index, text, onUpdate, onDelete, forceCollapsed }: Props) {
             <span className="text-sm font-medium text-gunmetal">
               📑 Chunk {index + 1}
             </span>
+            {sourceFile && (
+              <span className="text-[10px] text-sandy-dark bg-sandy/10 px-2 py-0.5 rounded-full font-mono truncate max-w-[200px]" title={sourceFile}>
+                {sourceFile}
+              </span>
+            )}
             
             {isConfirming ? (
                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>

@@ -134,6 +134,22 @@ export interface EmbeddingsJson {
 
 // ─── Progress Callback ──────────────────────────────────────────────────
 
+// ─── Multi-file Parsing Result ──────────────────────────────────────────
+
+export interface ParsedFileResult {
+  filename: string;
+  content: string;
+  excelRows?: string[];
+}
+
+// ─── Pinecone Field Mapping ────────────────────────────────────────────
+
+export interface PineconeFieldMapping {
+  idPrefix: string;
+  textField: string;
+  filenameField: string;
+}
+
 export type ProgressCallback = (pct: number, message?: string) => void;
 
 /**

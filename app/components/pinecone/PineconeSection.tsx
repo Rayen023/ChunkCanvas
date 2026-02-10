@@ -7,6 +7,7 @@ import DownloadScriptButton from "../downloads/DownloadScriptButton";
 
 export default function PineconeSection() {
   const editedChunks = useAppStore((s) => s.editedChunks);
+  const chunkSourceFiles = useAppStore((s) => s.chunkSourceFiles);
   const parsedFilename = useAppStore((s) => s.parsedFilename);
   const embeddingsData = useAppStore((s) => s.embeddingsData);
 
@@ -22,6 +23,8 @@ export default function PineconeSection() {
   const pineconeError = useAppStore((s) => s.pineconeError);
   const pineconeSuccess = useAppStore((s) => s.pineconeSuccess);
   const envPineconeKey = useAppStore((s) => s.envKeys.pinecone);
+  const pineconeFieldMapping = useAppStore((s) => s.pineconeFieldMapping);
+  const setPineconeFieldMapping = useAppStore((s) => s.setPineconeFieldMapping);
 
   const setPineconeApiKey = useAppStore((s) => s.setPineconeApiKey);
   const setPineconeEnvKey = useAppStore((s) => s.setPineconeEnvKey);
@@ -153,13 +156,13 @@ export default function PineconeSection() {
         parsedFilename,
         (pct) => setUploadProgress(pct),
         hasEmbeddings ? embeddingsData : null, // Pass existing embeddings if available
-        pineconeNamespace // Pass namespace
+        pineconeNamespace, // Pass namespace
+        chunkSourceFiles.length > 0 ? chunkSourceFiles : undefined,
+        pineconeFieldMapping,
       );
       setPineconeSuccess(
         `Chunks successfully uploaded to index "${pineconeIndexName}" (namespace: "${pineconeNamespace || "default"}").`,
       );
-      // Clear state after successful upload - REMOVED AUTO RESET
-      // setTimeout(() => resetDownstream(1), 2000);
     } catch (err) {
       setPineconeError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -168,7 +171,8 @@ export default function PineconeSection() {
   }, [
     pineconeApiKey, voyageApiKey, voyageModel, pineconeIndexName,
     editedChunks, parsedFilename, setIsUploading, setPineconeError,
-    setPineconeSuccess, resetDownstream, hasEmbeddings, embeddingsData, pineconeNamespace
+    setPineconeSuccess, resetDownstream, hasEmbeddings, embeddingsData,
+    pineconeNamespace, chunkSourceFiles, pineconeFieldMapping
   ]);
 
   if (editedChunks.length === 0) return null;
@@ -466,6 +470,82 @@ export default function PineconeSection() {
                <strong>Note:</strong> You must generate embeddings in the Voyage AI step above before uploading.
              </div>
           )}
+
+          {/* ── Field Name Editor ── */}
+          <details className="group rounded-lg border border-silver-light overflow-hidden">
+            <summary className="cursor-pointer select-none list-none flex items-center gap-2 bg-white px-4 py-3 hover:bg-sandy/4 transition-colors">
+              <svg className="h-4 w-4 text-sandy flex-shrink-0 group-open:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-sm font-medium text-gunmetal">Upload Field Names</span>
+              <span className="ml-auto text-[10px] text-silver-dark">Customize vector field names</span>
+            </summary>
+            <div className="border-t border-silver-light bg-gray-50/50 px-4 py-4 space-y-3">
+              <p className="text-[10px] text-silver-dark mb-2">
+                Edit the field names used when uploading vectors to Pinecone.
+              </p>
+
+              {/* ID Prefix */}
+              <div>
+                <label className="block text-xs font-medium text-gunmetal-light mb-1">
+                  Vector ID Prefix
+                </label>
+                <input
+                  type="text"
+                  value={pineconeFieldMapping.idPrefix}
+                  onChange={(e) => setPineconeFieldMapping({ idPrefix: e.target.value })}
+                  placeholder={parsedFilename || "filename"}
+                  className="w-full rounded-lg border border-silver px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+                />
+                <p className="text-[10px] text-silver-dark mt-0.5">
+                  ID format: <code className="font-mono text-gunmetal-light">{`{prefix}_chunk_{index}`}</code>
+                  {" — "}leave empty to use source filename
+                </p>
+              </div>
+
+              {/* Text Field */}
+              <div>
+                <label className="block text-xs font-medium text-gunmetal-light mb-1">
+                  Metadata: Text Field Name
+                </label>
+                <input
+                  type="text"
+                  value={pineconeFieldMapping.textField}
+                  onChange={(e) => setPineconeFieldMapping({ textField: e.target.value })}
+                  placeholder="text"
+                  className="w-full rounded-lg border border-silver px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+                />
+              </div>
+
+              {/* Filename Field */}
+              <div>
+                <label className="block text-xs font-medium text-gunmetal-light mb-1">
+                  Metadata: Filename Field Name
+                </label>
+                <input
+                  type="text"
+                  value={pineconeFieldMapping.filenameField}
+                  onChange={(e) => setPineconeFieldMapping({ filenameField: e.target.value })}
+                  placeholder="filename"
+                  className="w-full rounded-lg border border-silver px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+                />
+              </div>
+
+              {/* Preview */}
+              <div className="rounded-lg bg-slate-900 p-3 text-[10px] font-mono text-slate-300 space-y-1">
+                <p className="text-slate-500">{"// Upload preview per vector:"}</p>
+                <p>{`{`}</p>
+                <p className="pl-3">{`id: "${pineconeFieldMapping.idPrefix || parsedFilename || "file"}_chunk_0",`}</p>
+                <p className="pl-3">{`values: [0.123, -0.456, ...],`}</p>
+                <p className="pl-3">{`metadata: {`}</p>
+                <p className="pl-6">{`${pineconeFieldMapping.filenameField || "filename"}: "example.pdf",`}</p>
+                <p className="pl-6">{`${pineconeFieldMapping.textField || "text"}: "chunk content..."`}</p>
+                <p className="pl-3">{`}`}</p>
+                <p>{`}`}</p>
+                <p className="text-slate-500">{`// namespace: "${pineconeNamespace || "(default)"}"`}</p>
+              </div>
+            </div>
+          </details>
 
           {/* Action Buttons */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

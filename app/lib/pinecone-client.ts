@@ -2,7 +2,7 @@
  * Pinecone operations — browser-side via REST API (avoids fs dependency from SDK).
  * Uses direct fetch calls instead of the SDK to avoid Node.js-only modules.
  */
-import type { PineconeEnvironment } from "./types";
+import type { PineconeEnvironment, PineconeFieldMapping } from "./types";
 
 const PINECONE_CONTROL_URL = "https://api.pinecone.io";
 
@@ -74,6 +74,8 @@ export async function uploadChunks(
   onProgress?: (pct: number) => void,
   existingEmbeddings?: number[][] | null,
   namespace?: string,
+  chunkSourceFiles?: string[],
+  fieldMapping?: PineconeFieldMapping,
 ): Promise<void> {
   // Get index host
   const host = await getIndexHost(pineconeKey, indexName);
@@ -111,12 +113,20 @@ export async function uploadChunks(
 
   // Upsert to Pinecone in batches of 100 via REST
   const UPSERT_BATCH = 100;
+  const textKey = fieldMapping?.textField || "text";
+  const fnKey = fieldMapping?.filenameField || "filename";
+
   for (let i = 0; i < chunks.length; i += UPSERT_BATCH) {
-    const vectors = chunks.slice(i, i + UPSERT_BATCH).map((text, j) => ({
-      id: `${filename}_chunk_${i + j}`,
-      values: allEmbeddings[i + j],
-      metadata: { filename, text },
-    }));
+    const vectors = chunks.slice(i, i + UPSERT_BATCH).map((text, j) => {
+      const idx = i + j;
+      const sourceFile = chunkSourceFiles?.[idx] || filename;
+      const idPrefix = fieldMapping?.idPrefix || sourceFile;
+      return {
+        id: `${idPrefix}_chunk_${idx}`,
+        values: allEmbeddings[idx],
+        metadata: { [fnKey]: sourceFile, [textKey]: text },
+      };
+    });
 
     const res = await fetch(`${dataUrl}/vectors/upsert`, {
       method: "POST",

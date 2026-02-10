@@ -37,7 +37,8 @@ export default function OpenRouterForm() {
   const prompt = useAppStore((s) => s.openrouterPrompt);
   const pdfEngine = useAppStore((s) => s.pdfEngine);
   const pagesPerBatch = useAppStore((s) => s.openrouterPagesPerBatch);
-  const file = useAppStore((s) => s.file);
+  const files = useAppStore((s) => s.files);
+  const file = files[0] ?? null;
 
   const setApiKey = useAppStore((s) => s.setOpenrouterApiKey);
   const setModel = useAppStore((s) => s.setOpenrouterModel);

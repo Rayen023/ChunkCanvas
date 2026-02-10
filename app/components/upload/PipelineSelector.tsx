@@ -51,13 +51,13 @@ const PIPELINE_NEEDS_KEY: Record<string, boolean> = {
 };
 
 export default function PipelineSelector() {
-  const file = useAppStore((s) => s.file);
+  const files = useAppStore((s) => s.files);
   const pipeline = useAppStore((s) => s.pipeline);
   const setPipeline = useAppStore((s) => s.setPipeline);
 
   const ext = useMemo(
-    () => file?.name.split(".").pop()?.toLowerCase() ?? "",
-    [file],
+    () => files[0]?.name.split(".").pop()?.toLowerCase() ?? "",
+    [files],
   );
 
   /** Only the pipelines that are compatible with the current file (or all if no file) */
