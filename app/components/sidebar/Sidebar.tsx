@@ -12,6 +12,7 @@ const MAX_WIDTH = 480;
 /* ── Inline Reset All button component ─────────────── */
 function ResetAllButton() {
   const resetAll = useAppStore((s) => s.resetAll);
+  const pineconeSuccess = useAppStore((s) => s.pineconeSuccess);
   const [confirming, setConfirming] = useState(false);
 
   const handleClick = () => {
@@ -31,7 +32,9 @@ function ResetAllButton() {
         w-full flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer
         ${confirming
           ? "border-red-300 bg-red-50 text-red-600 hover:bg-red-100"
-          : "border-silver-light bg-white text-silver-dark hover:border-sandy hover:text-sandy"
+          : pineconeSuccess
+            ? "border-sandy bg-sandy text-white hover:bg-sandy-dark animate-pulse shadow-md"
+            : "border-silver-light bg-white text-silver-dark hover:border-sandy hover:text-sandy"
         }
       `}
     >

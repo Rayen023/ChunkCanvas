@@ -158,8 +158,8 @@ export default function PineconeSection() {
       setPineconeSuccess(
         `Chunks successfully uploaded to index "${pineconeIndexName}" (namespace: "${pineconeNamespace || "default"}").`,
       );
-      // Clear state after successful upload
-      setTimeout(() => resetDownstream(1), 2000);
+      // Clear state after successful upload - REMOVED AUTO RESET
+      // setTimeout(() => resetDownstream(1), 2000);
     } catch (err) {
       setPineconeError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -211,7 +211,7 @@ export default function PineconeSection() {
             <label className="block text-sm font-medium text-gunmetal mb-2">
               Pinecone Environment
             </label>
-            <div className="space-y-1.5">
+            <div className="flex flex-wrap gap-2">
               {PINECONE_ENVIRONMENTS.map((env) => {
                 const isSelected = pineconeEnvKey === env.key;
                 return (
@@ -220,7 +220,7 @@ export default function PineconeSection() {
                     type="button"
                     onClick={() => setPineconeEnvKey(env.key)}
                     className={`
-                      w-full text-left rounded-lg border px-3.5 py-2 transition-all duration-150 cursor-pointer flex items-center gap-2
+                      w-auto text-left rounded-lg border px-3 py-1.5 transition-all duration-150 cursor-pointer flex items-center gap-2
                       ${isSelected
                         ? "border-sandy bg-sandy/8 ring-2 ring-sandy/30"
                         : "border-silver-light bg-white hover:border-sandy/50 hover:bg-sandy/4"
@@ -229,15 +229,15 @@ export default function PineconeSection() {
                   >
                     <span
                       className={`
-                        flex-shrink-0 h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center transition-colors
+                        flex-shrink-0 h-3 w-3 rounded-full border-2 flex items-center justify-center transition-colors
                         ${isSelected ? "border-sandy" : "border-silver"}
                       `}
                     >
                       {isSelected && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-sandy" />
+                        <span className="h-1 w-1 rounded-full bg-sandy" />
                       )}
                     </span>
-                    <span className={`text-xs ${isSelected ? "text-gunmetal font-medium" : "text-gunmetal-light"}`}>
+                    <span className={`text-[11px] ${isSelected ? "text-gunmetal font-medium" : "text-gunmetal-light"}`}>
                       {env.label}
                     </span>
                   </button>
@@ -261,7 +261,7 @@ export default function PineconeSection() {
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {pineconeIndexes.map((idx) => {
                         const isSelected = pineconeIndexName === idx;
                         return (
@@ -270,7 +270,7 @@ export default function PineconeSection() {
                             type="button"
                             onClick={() => setPineconeIndexName(idx)}
                             className={`
-                              w-full text-left rounded-lg border px-3.5 py-2.5 transition-all duration-150 cursor-pointer flex items-center gap-2
+                              w-auto text-left rounded-lg border px-3 py-1.5 transition-all duration-150 cursor-pointer flex items-center gap-2
                               ${isSelected
                                 ? "border-sandy bg-sandy/8 ring-2 ring-sandy/30"
                                 : "border-silver-light bg-white hover:border-sandy/50 hover:bg-sandy/4"
@@ -279,15 +279,15 @@ export default function PineconeSection() {
                           >
                             <span
                               className={`
-                                flex-shrink-0 h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors
+                                flex-shrink-0 h-3 w-3 rounded-full border-2 flex items-center justify-center transition-colors
                                 ${isSelected ? "border-sandy" : "border-silver"}
                               `}
                             >
                               {isSelected && (
-                                <span className="h-2 w-2 rounded-full bg-sandy" />
+                                <span className="h-1 w-1 rounded-full bg-sandy" />
                               )}
                             </span>
-                            <span className={`text-sm font-medium font-mono ${isSelected ? "text-gunmetal" : "text-gunmetal-light"}`}>
+                            <span className={`text-[11px] font-medium font-mono ${isSelected ? "text-gunmetal" : "text-gunmetal-light"}`}>
                               {idx}
                             </span>
                           </button>
@@ -389,7 +389,7 @@ export default function PineconeSection() {
               <label className="block text-sm font-medium text-gunmetal mb-2">
                 Select Namespace
               </label>
-              <div className="space-y-1.5">
+              <div className="flex flex-wrap gap-2">
                 {pineconeNamespaces.map((ns) => {
                   const isSelected = !isCreatingNamespace && pineconeNamespace === ns;
                   const displayNs = ns === "" ? "(Default)" : ns;
@@ -402,7 +402,7 @@ export default function PineconeSection() {
                         setIsCreatingNamespace(false);
                       }}
                       className={`
-                        w-full text-left rounded-lg border px-3.5 py-2 transition-all duration-150 cursor-pointer flex items-center gap-2
+                        w-auto text-left rounded-lg border px-3 py-1.5 transition-all duration-150 cursor-pointer flex items-center gap-2
                         ${isSelected
                           ? "border-sandy bg-sandy/8 ring-2 ring-sandy/30"
                           : "border-silver-light bg-white hover:border-sandy/50 hover:bg-sandy/4"
@@ -411,55 +411,40 @@ export default function PineconeSection() {
                     >
                       <span
                         className={`
-                          flex-shrink-0 h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors
+                          flex-shrink-0 h-3 w-3 rounded-full border-2 flex items-center justify-center transition-colors
                           ${isSelected ? "border-sandy" : "border-silver"}
                         `}
                       >
                         {isSelected && (
-                          <span className="h-2 w-2 rounded-full bg-sandy" />
+                          <span className="h-1 w-1 rounded-full bg-sandy" />
                         )}
                       </span>
-                      <span className={`text-sm font-medium font-mono ${isSelected ? "text-gunmetal" : "text-gunmetal-light"}`}>
+                      <span className={`text-[11px] font-medium font-mono ${isSelected ? "text-gunmetal" : "text-gunmetal-light"}`}>
                         {displayNs}
                       </span>
                     </button>
                   );
                 })}
-                
-                {/* Create New Namespace Option */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCreatingNamespace(true);
-                    setPineconeNamespace(""); // Reset to empty for typing
-                  }}
-                  className={`
-                    w-full text-left rounded-lg border px-3.5 py-2 transition-all duration-150 cursor-pointer flex items-center gap-2
-                    ${isCreatingNamespace
-                      ? "border-sandy bg-sandy/8 ring-2 ring-sandy/30"
-                      : "border-silver-light bg-white hover:border-sandy/50 hover:bg-sandy/4"
-                    }
-                  `}
-                >
-                  <span
-                    className={`
-                      flex-shrink-0 h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors
-                      ${isCreatingNamespace ? "border-sandy" : "border-silver"}
-                    `}
-                  >
-                    {isCreatingNamespace && (
-                      <span className="h-2 w-2 rounded-full bg-sandy" />
-                    )}
-                  </span>
-                  <span className={`text-sm font-medium ${isCreatingNamespace ? "text-gunmetal" : "text-gunmetal-light"}`}>
-                    Create / Enter New Namespace
-                  </span>
-                </button>
+              </div>
 
-                {/* Input for new namespace */}
-                {isCreatingNamespace && (
-                  <div className="pt-1 pl-8">
-                     <input
+              {/* Create Namespace — collapsible */}
+              <div className="mt-4">
+                <details
+                  open={isCreatingNamespace}
+                  onToggle={(e) => setIsCreatingNamespace((e.target as HTMLDetailsElement).open)}
+                  className="group rounded-lg border border-silver-light overflow-hidden"
+                >
+                  <summary className="cursor-pointer select-none list-none flex items-center gap-2 bg-white px-4 py-3 hover:bg-sandy/4 transition-colors">
+                    <svg className="h-4 w-4 text-sandy flex-shrink-0 group-open:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span className="text-sm font-medium text-gunmetal">Create / Enter New Namespace</span>
+                    <svg className="h-4 w-4 text-sandy ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                  </summary>
+                  <div className="border-t border-silver-light bg-gray-50/50 px-4 py-4 space-y-3">
+                    <input
                       type="text"
                       value={pineconeNamespace}
                       onChange={(e) => setPineconeNamespace(e.target.value)}
@@ -470,7 +455,7 @@ export default function PineconeSection() {
                       Data will be uploaded to this namespace. If it doesn&apos;t exist, it will be created implicitly.
                     </p>
                   </div>
-                )}
+                </details>
               </div>
             </div>
           )}
