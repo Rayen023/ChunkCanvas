@@ -10,8 +10,8 @@ import ThemeToggle from "./ThemeToggle";
 const MIN_WIDTH = 220;
 const MAX_WIDTH = 480;
 
-/* ── Inline Reset All button component ─────────────── */
-function ResetAllButton() {
+/* ── Inline Reset button component ─────────────────── */
+function ResetButton() {
   const resetAll = useAppStore((s) => s.resetAll);
   const pineconeSuccess = useAppStore((s) => s.pineconeSuccess);
   const [confirming, setConfirming] = useState(false);
@@ -42,7 +42,7 @@ function ResetAllButton() {
       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
       </svg>
-      {confirming ? "Click again to confirm reset" : "Reset All"}
+      {confirming ? "Confirm" : "Reset"}
     </button>
   );
 }
@@ -143,6 +143,8 @@ export default function Sidebar() {
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
           <AppInfo />
 
+          <ResetButton />
+
           <div className="h-px bg-silver-light" />
 
           <VllmStatus />
@@ -155,7 +157,6 @@ export default function Sidebar() {
         {/* ── Footer ──────────────────────────────────── */}
         <div className="px-4 py-3 border-t border-silver-light space-y-3">
           <ThemeToggle />
-          <ResetAllButton />
           <p className="text-[10px] text-silver-dark text-center">
             ChunkCanvas &mdash; Rayen Ghali
           </p>
