@@ -1,10 +1,22 @@
 "use client";
 
-import { useAppStore } from "@/app/lib/store";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 export default function ThemeToggle() {
-  const theme = useAppStore((s) => s.theme);
-  const setTheme = useAppStore((s) => s.setTheme);
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="flex items-center gap-1 p-1 bg-silver-light/20 rounded-lg h-[34px] w-full animate-pulse" />
+    );
+  }
 
   return (
     <div className="flex items-center gap-1 p-1 bg-silver-light/20 rounded-lg">

@@ -26,21 +26,41 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <div className="flex min-h-screen">
-          <ThemeProvider />
-          {/* Sidebar — client component with collapse/resize */}
-          <Sidebar />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var width = 288;
+                  var storage = localStorage.getItem('chunkcanvas-preferences');
+                  if (storage) {
+                    var state = JSON.parse(storage).state;
+                    if (state && state.sidebarWidth) {
+                      width = state.sidebarWidth;
+                    }
+                  }
+                  document.documentElement.style.setProperty('--sidebar-width', width + 'px');
+                } catch (e) {}
+              })()
+            `,
+          }}
+        />
+        <ThemeProvider>
+          <div className="flex min-h-screen">
+            {/* Sidebar — client component with collapse/resize */}
+            <Sidebar />
 
-          {/* Main content */}
-          <main className="flex-1 overflow-y-auto">
-            <EnvLoader />
-            {children}
-          </main>
-        </div>
+            {/* Main content */}
+            <main className="flex-1 overflow-y-auto">
+              <EnvLoader />
+              {children}
+            </main>
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );

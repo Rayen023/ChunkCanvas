@@ -1,12 +1,15 @@
 "use client";
 
 import { useAppStore } from "@/app/lib/store";
+import { useTheme } from "next-themes";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 
 /** Regex matching the file separator used during multi-file parsing: ═══ filename ═══ */
 const FILE_SEP_RE = /═══ (.+?) ═══/g;
 
 export default function ParsedDocumentView() {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const parsedContent = useAppStore((s) => s.parsedContent);
   const setParsedContent = useAppStore((s) => s.setParsedContent);
   const isParsing = useAppStore((s) => s.isParsing);
@@ -15,6 +18,11 @@ export default function ParsedDocumentView() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevLenRef = useRef(0);
   const userScrolledRef = useRef(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
   // ── Derive file sections from parsed content ───────────
   const fileSections = useMemo(() => {
@@ -195,10 +203,10 @@ export default function ParsedDocumentView() {
         onChange={handleChange}
         readOnly={isParsing}
         onScroll={handleScroll}
-        className={`w-full h-[500px] rounded-xl border p-4 text-sm font-mono text-gunmetal-light resize-y focus:outline-none focus:ring-2 focus:ring-sandy/50 focus:border-sandy ${
+        className={`parsed-document-textarea w-full h-[500px] rounded-xl border p-4 text-sm font-mono text-gunmetal-light resize-y focus:outline-none focus:ring-2 focus:ring-sandy/50 focus:border-sandy ${
           isParsing
-            ? "border-blue-200 bg-slate-50 cursor-default"
-            : "border-silver-light bg-card dark:bg-black/20"
+            ? "border-blue-200 cursor-default"
+            : "border-silver-light"
         }`}
       />
     </div>

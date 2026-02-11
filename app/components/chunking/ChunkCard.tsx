@@ -9,9 +9,10 @@ interface Props {
   onUpdate: (index: number, text: string) => void;
   onDelete: (index: number) => void;
   forceCollapsed?: boolean;
+  isLightMode?: boolean;
 }
 
-function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed }: Props) {
+function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed, isLightMode }: Props) {
   const [localExpanded, setLocalExpanded] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
   const [prevText, setPrevText] = useState(text);
@@ -76,11 +77,15 @@ function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed
   };
 
   return (
-    <div className="rounded-xl border border-silver-light bg-card shadow-sm overflow-hidden">
+    <div
+      className={`rounded-xl border border-silver-light shadow-sm overflow-hidden ${
+        isLightMode ? "!bg-[#fbfbfb]" : "dark:!bg-card"
+      }`}
+    >
       {/* Header */}
       <div
         onClick={() => setLocalExpanded((v) => !v)}
-        className="flex w-full items-center justify-between px-4 py-3 cursor-pointer hover:bg-silver-light/30 transition-colors select-none"
+        className="flex w-full items-center justify-between px-4 py-3 cursor-pointer hover:bg-silver-light/30 transition-colors "
       >
         <div className="flex w-full items-center justify-between">
           <div className="flex items-center gap-3">
@@ -182,7 +187,9 @@ function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed
             value={text}
             onChange={handleChange}
             rows={10}
-            className="w-full rounded-lg border border-silver px-3 py-2 text-sm font-mono text-gunmetal-light bg-card dark:bg-black/20 focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none resize-y"
+            className={`w-full rounded-lg border border-silver px-3 py-2 text-sm font-mono text-gunmetal-light focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none resize-y ${
+              isLightMode ? "!bg-[#fbfbfb]" : "dark:!bg-black/20"
+            }`}
           />
         </div>
       )}

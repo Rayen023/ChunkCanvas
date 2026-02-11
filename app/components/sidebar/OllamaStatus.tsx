@@ -69,7 +69,7 @@ export default function OllamaStatus() {
 
   return (
     <details className="group">
-      <summary className="cursor-pointer text-sm font-semibold text-gunmetal select-none flex items-center gap-2">
+      <summary className="cursor-pointer text-sm font-semibold text-gunmetal flex items-center gap-2">
         <svg
           className="h-4 w-4 transition-transform group-open:rotate-90"
           fill="none"

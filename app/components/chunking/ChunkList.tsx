@@ -1,11 +1,20 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAppStore } from "@/app/lib/store";
+import { useTheme } from "next-themes";
 import ChunkCard from "./ChunkCard";
 
 export default function ChunkList() {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const editedChunks = useAppStore((s) => s.editedChunks);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
   const chunkSourceFiles = useAppStore((s) => s.chunkSourceFiles);
   const updateChunk = useAppStore((s) => s.updateChunk);
   const deleteChunk = useAppStore((s) => s.deleteChunk);
@@ -72,6 +81,7 @@ export default function ChunkList() {
             onUpdate={onUpdate}
             onDelete={onDelete}
             forceCollapsed={allChunksCollapsed}
+            isLightMode={mounted && resolvedTheme === "light"}
           />
         ))}
       </div>

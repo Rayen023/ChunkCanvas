@@ -121,7 +121,7 @@ export default function VllmStatus() {
       
       if (!isNaN(currentPort)) {
         url.port = (currentPort + 1).toString();
-        nextEndpoint = url.toString();
+        nextEndpoint = url.toString().replace(/\/$/, "");
       } else {
         // Fallback if port parsing fails but URL is valid-ish
         nextEndpoint = lastEndpoint;
@@ -153,7 +153,7 @@ export default function VllmStatus() {
 
   return (
     <details className="group">
-      <summary className="cursor-pointer text-sm font-semibold text-gunmetal select-none flex items-center gap-2">
+      <summary className="cursor-pointer text-sm font-semibold text-gunmetal flex items-center gap-2">
         <svg
           className="h-4 w-4 transition-transform group-open:rotate-90"
           fill="none"

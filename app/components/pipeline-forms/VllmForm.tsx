@@ -86,7 +86,7 @@ export default function VllmForm({ ext }: { ext: string }) {
           value={endpoint}
           onChange={(e) => setEndpoint(e.target.value)}
           placeholder={DEFAULT_VLLM_ENDPOINT}
-          className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+          className="w-full rounded-lg border border-silver bg-card px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
         />
         <div className="mt-1">
           <button
@@ -146,13 +146,13 @@ export default function VllmForm({ ext }: { ext: string }) {
       {/* Prompt */}
       <div>
         <label className="block text-sm font-medium text-gunmetal mb-1">
-          Prompt / Instruction
+          Prompt
         </label>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           rows={6}
-          className="w-full rounded-lg border border-silver px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none resize-y"
+          className="w-full rounded-lg border border-silver bg-card px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none resize-y"
         />
       </div>
     </div>

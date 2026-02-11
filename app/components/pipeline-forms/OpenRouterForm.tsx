@@ -33,11 +33,13 @@ export default function OpenRouterForm({ ext }: { ext: string }) {
   const pipelinesByExt = useAppStore((s) => s.pipelinesByExt);
   const pipeline = pipelinesByExt[ext] ?? "";
   const apiKey = useAppStore((s) => s.openrouterApiKey);
+  const setOpenrouterApiKey = useAppStore((s) => s.setOpenrouterApiKey);
+  const envOpenrouterKey = useAppStore((s) => s.envKeys.openrouter);
   const config = useAppStore((s) => s.configByExt[ext]);
   const setConfigForExt = useAppStore((s) => s.setConfigForExt);
   const files = useAppStore((s) => s.files);
-  const file = useMemo(
-    () => files.find(f => (f.name.split(".").pop()?.toLowerCase() ?? "") === ext) ?? null,
+  const pdfFiles = useMemo(
+    () => files.filter(f => (f.name.split(".").pop()?.toLowerCase() ?? "") === ext),
     [files, ext],
   );
 
@@ -54,34 +56,82 @@ export default function OpenRouterForm({ ext }: { ext: string }) {
   const modality: Modality = PIPELINE_MODALITY[pipeline] ?? "file";
   const isPdf = pipeline.includes("PDF");
 
-  // ── Calculate PDF Pages ───────────────────────────────────
-  const [totalPages, setTotalPages] = useState<number>(0);
+  // ── Calculate PDF Pages (all files) ────────────────────────
+  const [pageMap, setPageMap] = useState<Map<string, number>>(new Map());
+
+  const maxPages = useMemo(() => {
+    if (pageMap.size === 0) return 0;
+    return Math.max(...pageMap.values());
+  }, [pageMap]);
+
+  const totalPagesAllFiles = useMemo(() => {
+    if (pageMap.size === 0) return 0;
+    let sum = 0;
+    pageMap.forEach((v) => { sum += v; });
+    return sum;
+  }, [pageMap]);
+
+  const totalBatches = useMemo(() => {
+    if (pageMap.size === 0) return 0;
+    const batchSize = pagesPerBatch > 0 ? pagesPerBatch : maxPages;
+    if (batchSize === 0) return 0;
+    let sum = 0;
+    pageMap.forEach((pages) => { sum += Math.ceil(pages / batchSize); });
+    return sum;
+  }, [pageMap, pagesPerBatch, maxPages]);
+
+  const clampPages = useCallback((val: number) => {
+    let next = Math.max(1, val);
+    if (maxPages > 0 && next > maxPages) next = maxPages;
+    return next;
+  }, [maxPages]);
 
   useEffect(() => {
-    if (!isPdf || !file) return;
-    
+    if (!isPdf || pdfFiles.length === 0) {
+      setPageMap(new Map());
+      return;
+    }
+
     let cancelled = false;
-    const countPages = async () => {
+    const countAllPages = async () => {
       try {
         const { PDFDocument } = await import("pdf-lib");
-        const buffer = await file.arrayBuffer();
-        // Load with ignoreEncryption to avoid errors on some files, though encrypted files might still fail
-        const doc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+        const results = new Map<string, number>();
+        let globalMax = 0;
+
+        await Promise.all(
+          pdfFiles.map(async (f) => {
+            try {
+              const buffer = await f.arrayBuffer();
+              const doc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+              const count = doc.getPageCount();
+              results.set(f.name, count);
+              if (count > globalMax) globalMax = count;
+            } catch (err) {
+              console.error(`Failed to count pages for ${f.name}:`, err);
+            }
+          }),
+        );
+
         if (!cancelled) {
-          const count = doc.getPageCount();
-          setTotalPages(count);
-          // Set default to all pages (total count) if 0 or invalid
-          if (pagesPerBatch === 0 || pagesPerBatch > count) {
-            setPagesPerBatch(count);
+          setPageMap(results);
+          // Set default to max pages if 0 or exceeds max
+          if (pagesPerBatch === 0 || pagesPerBatch > globalMax) {
+            setPagesPerBatch(globalMax);
           }
         }
       } catch (err) {
         console.error("Failed to count PDF pages:", err);
       }
     };
-    countPages();
+    countAllPages();
     return () => { cancelled = true; };
-  }, [file, isPdf, setPagesPerBatch, pagesPerBatch]);
+  }, [pdfFiles, isPdf, setPagesPerBatch, pagesPerBatch]);
+
+  // Auto-fill env key once
+  useEffect(() => {
+    if (!apiKey && envOpenrouterKey) setOpenrouterApiKey(envOpenrouterKey);
+  }, [apiKey, envOpenrouterKey, setOpenrouterApiKey]);
 
   // Set default prompt on pipeline change
   useEffect(() => {
@@ -137,6 +187,19 @@ export default function OpenRouterForm({ ext }: { ext: string }) {
 
   return (
     <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gunmetal mb-1">
+          OpenRouter API Key
+        </label>
+        <input
+          type="password"
+          value={apiKey}
+          onChange={(e) => setOpenrouterApiKey(e.target.value)}
+          placeholder="sk-or-..."
+          className="w-full rounded-lg border border-silver bg-card px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+        />
+      </div>
+
       {/* Model Selector */}
       <div>
         <label className="block text-sm font-medium text-gunmetal mb-1">
@@ -165,9 +228,10 @@ export default function OpenRouterForm({ ext }: { ext: string }) {
         </select>
       </div>
 
-      {/* PDF Engine (PDF only) */}
+      {/* PDF Engine & Pages per Batch (PDF only) */}
       {isPdf && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-4">
+          {/* PDF Processing Engine */}
           <div>
             <label className="block text-sm font-medium text-gunmetal mb-1">
               PDF Processing Engine
@@ -186,35 +250,134 @@ export default function OpenRouterForm({ ext }: { ext: string }) {
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gunmetal mb-1">
-              Pages Per Batch
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min={1}
-                max={totalPages || undefined}
-                value={pagesPerBatch === 0 ? "" : pagesPerBatch}
-                onChange={(e) => {
-                  let val = parseInt(e.target.value);
-                  if (isNaN(val)) val = 0;
-                  // Clamp value to total pages if known
-                  if (totalPages > 0 && val > totalPages) val = totalPages;
-                  setPagesPerBatch(val);
-                }}
-                placeholder={totalPages > 0 ? `Max: ${totalPages}` : "All pages"}
-                className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
-              />
-              {totalPages > 0 && (
-                <span className="absolute right-3 top-2 text-xs text-silver-dark pointer-events-none">
-                  / {totalPages}
-                </span>
+
+          {/* Pages per Batch */}
+          <div className="rounded-lg border border-silver bg-card p-4 space-y-3">
+            {/* Header row: label + total batches badge */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-gunmetal">
+                  Pages per request
+                </label>
+                <p className="text-xs text-silver-dark mt-0.5">
+                  How many PDF pages to send in each request
+                </p>
+              </div>
+              {maxPages > 0 && (
+                <div className="text-right shrink-0 ml-4">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-sandy/10 px-2.5 py-1 text-sm font-semibold text-sandy tabular-nums">
+                    {totalBatches}
+                    <span className="text-xs font-medium text-sandy/70">Request{totalBatches !== 1 ? "s" : ""}</span>
+                  </span>
+                </div>
               )}
             </div>
-            <p className="mt-1 text-xs text-silver-dark">
-              Process {pagesPerBatch} page{pagesPerBatch !== 1 ? "s" : ""} at a time.
-            </p>
+
+            {/* Controls: stepper + slider + All button */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center rounded-lg border border-silver overflow-hidden shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (pagesPerBatch === 0) {
+                      setPagesPerBatch(1);
+                      return;
+                    }
+                    setPagesPerBatch(clampPages(pagesPerBatch - 1));
+                  }}
+                  disabled={pagesPerBatch <= 1}
+                  className="px-3 py-2 text-sm font-medium text-gunmetal hover:bg-sandy/10 active:bg-sandy/20 disabled:opacity-40 transition-colors duration-150"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  min={1}
+                  max={maxPages || undefined}
+                  value={pagesPerBatch === 0 ? "" : pagesPerBatch}
+                  onChange={(e) => {
+                    if (e.target.value === "") {
+                      setPagesPerBatch(0);
+                      return;
+                    }
+                    const val = Number(e.target.value);
+                    if (Number.isNaN(val)) return;
+                    setPagesPerBatch(clampPages(val));
+                  }}
+                  placeholder={maxPages > 0 ? String(maxPages) : "All"}
+                  className="w-14 py-2 text-center text-sm font-medium tabular-nums border-x border-silver bg-transparent focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (pagesPerBatch === 0) {
+                      setPagesPerBatch(1);
+                      return;
+                    }
+                    setPagesPerBatch(clampPages(pagesPerBatch + 1));
+                  }}
+                  disabled={maxPages > 0 && pagesPerBatch >= maxPages}
+                  className="px-3 py-2 text-sm font-medium text-gunmetal hover:bg-sandy/10 active:bg-sandy/20 disabled:opacity-40 transition-colors duration-150"
+                >
+                  +
+                </button>
+              </div>
+
+              {maxPages > 1 && (
+                <input
+                  type="range"
+                  min={1}
+                  max={maxPages}
+                  value={pagesPerBatch > 0 ? pagesPerBatch : maxPages}
+                  onChange={(e) => setPagesPerBatch(clampPages(Number(e.target.value)))}
+                  className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer accent-sandy bg-silver/40 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sandy [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-sandy [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+                />
+              )}
+
+              {maxPages > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setPagesPerBatch(maxPages)}
+                  className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors duration-150 ${
+                    pagesPerBatch === maxPages
+                      ? "bg-sandy text-white border-sandy"
+                      : "border-silver text-gunmetal hover:bg-sandy/10 hover:border-sandy/50"
+                  }`}
+                >
+                  All
+                </button>
+              )}
+            </div>
+
+            {/* Per-file breakdown */}
+            {maxPages > 0 && (
+              <div className="border-t border-silver/50 pt-3">
+                <div className="space-y-1.5">
+                  {Array.from(pageMap.entries()).map(([name, pages]) => {
+                    const batchSize = pagesPerBatch > 0 ? pagesPerBatch : maxPages;
+                    const batches = batchSize > 0 ? Math.ceil(pages / batchSize) : 1;
+                    return (
+                      <div key={name} className="flex items-center justify-between text-xs">
+                        <span className="text-gunmetal/80 truncate mr-3 font-mono" title={name}>
+                          {name}
+                        </span>
+                        <span className="shrink-0 tabular-nums text-silver-dark">
+                          {pages} pg{pages !== 1 ? "s" : ""}
+                          {" → "}
+                          <span className="font-medium text-gunmetal">{batches}</span> request{batches !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-dashed border-silver/40 text-xs font-medium">
+                  <span className="text-gunmetal/70">Total</span>
+                  <span className="tabular-nums text-gunmetal">
+                    {totalPagesAllFiles} pages → {totalBatches} request{totalBatches !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -222,13 +385,13 @@ export default function OpenRouterForm({ ext }: { ext: string }) {
       {/* Prompt */}
       <div>
         <label className="block text-sm font-medium text-gunmetal mb-1">
-          Prompt / Instruction
+          Prompt
         </label>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           rows={6}
-          className="w-full rounded-lg border border-silver px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none resize-y"
+          className="w-full rounded-lg border border-silver bg-card px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none resize-y"
         />
       </div>
     </div>

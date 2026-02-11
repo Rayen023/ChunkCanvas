@@ -49,7 +49,6 @@ function ResetAllButton() {
 
 export default function Sidebar() {
   const collapsed = useAppStore((s) => s.sidebarCollapsed);
-  const width = useAppStore((s) => s.sidebarWidth);
   const setCollapsed = useAppStore((s) => s.setSidebarCollapsed);
   const setWidth = useAppStore((s) => s.setSidebarWidth);
 
@@ -112,8 +111,8 @@ export default function Sidebar() {
     <>
       <aside
         ref={sidebarRef}
-        style={{ width }}
-        className="relative hidden lg:flex flex-col border-r border-silver-light bg-card sticky top-0 h-screen overflow-hidden select-none flex-shrink-0"
+        style={{ width: "var(--sidebar-width, 288px)" }}
+        className="relative hidden lg:flex flex-col border-r border-silver-light bg-card sticky top-0 h-screen overflow-hidden flex-shrink-0"
       >
         {/* ── Header ──────────────────────────────────── */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2">

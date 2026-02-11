@@ -107,7 +107,7 @@ export default function ChunkingParams() {
                 type="button"
                 onClick={() => toggleSep(sep)}
                 className={`
-                  inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-medium transition-all cursor-pointer select-none
+                  inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-medium transition-all cursor-pointer 
                   ${active
                     ? "border-sandy bg-sandy/10 text-sandy-dark"
                     : "border-silver-light bg-card text-silver-dark line-through opacity-60 hover:opacity-80"

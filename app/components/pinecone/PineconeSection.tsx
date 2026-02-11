@@ -306,7 +306,7 @@ export default function PineconeSection() {
                   onToggle={(e) => setShowCreate((e.target as HTMLDetailsElement).open)}
                   className="group rounded-lg border border-silver-light overflow-hidden"
                 >
-                  <summary className="cursor-pointer select-none list-none flex items-center gap-2 bg-card px-4 py-3 hover:bg-sandy/4 transition-colors">
+                  <summary className="cursor-pointer  list-none flex items-center gap-2 bg-card px-4 py-3 hover:bg-sandy/4 transition-colors">
                     <svg className="h-4 w-4 text-sandy flex-shrink-0 group-open:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
@@ -437,7 +437,7 @@ export default function PineconeSection() {
                   onToggle={(e) => setIsCreatingNamespace((e.target as HTMLDetailsElement).open)}
                   className="group rounded-lg border border-silver-light overflow-hidden"
                 >
-                  <summary className="cursor-pointer select-none list-none flex items-center gap-2 bg-card px-4 py-3 hover:bg-sandy/4 transition-colors">
+                  <summary className="cursor-pointer  list-none flex items-center gap-2 bg-card px-4 py-3 hover:bg-sandy/4 transition-colors">
                     <svg className="h-4 w-4 text-sandy flex-shrink-0 group-open:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
@@ -472,7 +472,7 @@ export default function PineconeSection() {
 
           {/* ── Field Name Editor ── */}
           <details className="group rounded-lg border border-silver-light overflow-hidden">
-            <summary className="cursor-pointer select-none list-none flex items-center gap-2 bg-card px-4 py-3 hover:bg-sandy/4 transition-colors">
+            <summary className="cursor-pointer  list-none flex items-center gap-2 bg-card px-4 py-3 hover:bg-sandy/4 transition-colors">
               <svg className="h-4 w-4 text-sandy flex-shrink-0 group-open:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>

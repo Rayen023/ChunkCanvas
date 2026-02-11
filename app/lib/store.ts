@@ -94,7 +94,6 @@ export interface AppState {
   sidebarCollapsed: boolean;
   sidebarWidth: number;
   scrollActiveStep: number | null;
-  theme: "light" | "dark" | "system";
 
   // ── API keys from env ─────────────────────────
   envKeys: {
@@ -192,7 +191,6 @@ export interface AppActions {
   setSidebarCollapsed: (v: boolean) => void;
   setSidebarWidth: (w: number) => void;
   setScrollActiveStep: (step: number | null) => void;
-  setTheme: (theme: "light" | "dark" | "system") => void;
 
   // UI state
   setAllChunksCollapsed: (v: boolean) => void;
@@ -306,7 +304,6 @@ export const useAppStore = create<AppState & AppActions>()(
   sidebarCollapsed: false,
   sidebarWidth: 288,
   scrollActiveStep: null,
-  theme: "system",
   envKeys: { openrouter: "", voyage: "", pinecone: "" },
 
   // Persisted user preferences (initial empty — hydrated from localStorage)
@@ -490,9 +487,13 @@ export const useAppStore = create<AppState & AppActions>()(
   setAllChunksCollapsed: (v) => set({ allChunksCollapsed: v }),
 
   setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
-  setSidebarWidth: (w) => set({ sidebarWidth: w }),
+  setSidebarWidth: (w) => {
+    set({ sidebarWidth: w });
+    if (typeof document !== "undefined") {
+      document.documentElement.style.setProperty("--sidebar-width", `${w}px`);
+    }
+  },
   setScrollActiveStep: (step) => set({ scrollActiveStep: step }),
-  setTheme: (theme) => set({ theme }),
 
   setEnvKeys: (keys) =>
     set((s) => ({ envKeys: { ...s.envKeys, ...keys } })),
@@ -508,6 +509,10 @@ export const useAppStore = create<AppState & AppActions>()(
 
   resetAll: () => {
     const s = get();
+    // Sync sidebar width visual immediately
+    if (typeof document !== "undefined") {
+      document.documentElement.style.setProperty("--sidebar-width", "288px");
+    }
     set({
       files: [],
       pipeline: "",
@@ -566,6 +571,7 @@ export const useAppStore = create<AppState & AppActions>()(
       pineconeSuccess: null,
       allChunksCollapsed: false,
       scrollActiveStep: null,
+      sidebarWidth: 288,
       // Keep persisted preferences intact (not cleared on reset)
       // lastPipelineByExt, lastConfigByExt, lastEmbeddingProvider are preserved
     });
@@ -664,7 +670,7 @@ export const useAppStore = create<AppState & AppActions>()(
         // UI preferences
         sidebarCollapsed: state.sidebarCollapsed,
         sidebarWidth: state.sidebarWidth,
-        theme: state.theme,
+        // Theme removed
       }),
       /**
        * Merge persisted preferences into the initial state on hydration.

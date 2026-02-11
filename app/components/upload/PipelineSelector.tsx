@@ -63,16 +63,6 @@ export default function PipelineSelector() {
   const setPipelineForExt = useAppStore((s) => s.setPipelineForExt);
   const lastPipelineByExt = useAppStore((s) => s.lastPipelineByExt);
 
-  // Global OpenRouter API key (shared across all ext groups)
-  const openrouterApiKey = useAppStore((s) => s.openrouterApiKey);
-  const setOpenrouterApiKey = useAppStore((s) => s.setOpenrouterApiKey);
-  const envOpenrouterKey = useAppStore((s) => s.envKeys.openrouter);
-
-  // Auto-fill env key once
-  useEffect(() => {
-    if (!openrouterApiKey && envOpenrouterKey) setOpenrouterApiKey(envOpenrouterKey);
-  }, [openrouterApiKey, envOpenrouterKey, setOpenrouterApiKey]);
-
   /** Group files by extension */
   const extGroups = useMemo(() => {
     const groups: Record<string, File[]> = {};
@@ -98,11 +88,6 @@ export default function PipelineSelector() {
   const extKeys = Object.keys(extGroups);
   const multiGroup = extKeys.length > 1;
 
-  /** Whether any ext uses an OpenRouter pipeline */
-  const anyOpenRouter = useMemo(
-    () => Object.values(pipelinesByExt).some((p) => p.startsWith("OpenRouter")),
-    [pipelinesByExt],
-  );
 
   // Auto-select: single compatible pipeline, or restore last-used if compatible
   useEffect(() => {
@@ -133,27 +118,6 @@ export default function PipelineSelector() {
 
   return (
     <div className="space-y-5">
-      {/* Global OpenRouter API Key — shown once when any ext uses OpenRouter */}
-      {anyOpenRouter && (
-        <div className="space-y-1.5 p-3 bg-amber-50/50 rounded-lg border border-amber-100">
-          <label className="block text-sm font-medium text-gunmetal">
-            OpenRouter API Key
-          </label>
-          <input
-            type="password"
-            value={openrouterApiKey}
-            onChange={(e) => setOpenrouterApiKey(e.target.value)}
-            placeholder="sk-or-..."
-            className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
-          />
-          {!openrouterApiKey && (
-            <p className="text-xs text-amber-600">
-              Required for all OpenRouter pipelines.
-            </p>
-          )}
-        </div>
-      )}
-
       {/* Per-extension groups */}
       <div className="space-y-5">
         {extKeys.map((ext) => {
@@ -240,7 +204,7 @@ export default function PipelineSelector() {
 
               {/* Per-extension config form — appears below selected pipeline */}
               {selected && selected !== PIPELINE.SIMPLE_TEXT && (
-                <div className="ml-1 p-4 bg-slate-50 rounded-lg border border-silver-light space-y-3">
+                <div className="ml-1 p-4 bg-config-bg rounded-lg border border-config-border space-y-3">
                   {selected.startsWith("OpenRouter") && (
                     <OpenRouterForm ext={ext} />
                   )}
