@@ -660,9 +660,6 @@ export const useAppStore = create<AppState & AppActions>()(
         vllmAdditionalEndpoints: state.vllmAdditionalEndpoints,
         vllmModel: state.vllmModel,
 
-        // Chunking parameters
-        chunkingParams: state.chunkingParams,
-
         // Embedding settings
         embeddingProvider: state.embeddingProvider,
         voyageModel: state.voyageModel,
@@ -679,6 +676,9 @@ export const useAppStore = create<AppState & AppActions>()(
         pineconeIndexName: state.pineconeIndexName,
         pineconeNamespace: state.pineconeNamespace,
         pineconeFieldMapping: state.pineconeFieldMapping,
+
+        // Chunking settings
+        chunkingParams: state.chunkingParams,
 
         // UI preferences
         sidebarCollapsed: state.sidebarCollapsed,

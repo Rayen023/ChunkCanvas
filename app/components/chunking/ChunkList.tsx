@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { useAppStore } from "@/app/lib/store";
 import { useTheme } from "next-themes";
 import ChunkCard from "./ChunkCard";
+import { countTokens } from "@/app/lib/tokenizer";
 
 export default function ChunkList() {
   const { resolvedTheme } = useTheme();
@@ -30,6 +31,10 @@ export default function ChunkList() {
     (index: number) => deleteChunk(index),
     [deleteChunk],
   );
+
+  const totalTokens = useMemo(() => {
+    return editedChunks.reduce((acc, chunk) => acc + countTokens(chunk), 0);
+  }, [editedChunks]);
 
   if (editedChunks.length === 0) return null;
 
@@ -67,6 +72,8 @@ export default function ChunkList() {
           </button>
           <span className="text-sm text-gunmetal-light">
             <strong>{editedChunks.length}</strong> chunks
+            <span className="mx-2 text-silver">•</span>
+            <strong>{totalTokens.toLocaleString()}</strong> tokens
           </span>
         </div>
       </div>

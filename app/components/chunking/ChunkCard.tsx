@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, memo, useMemo, useEffect, useRef } from "react";
+import { countTokens } from "@/app/lib/tokenizer";
 
 interface Props {
   index: number;
@@ -37,10 +38,8 @@ function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed
 
   const expanded = localExpanded;
 
-  const wordCount = useMemo(() => {
-    if (!text) return 0;
-    const words = text.trim().split(/\s+/);
-    return words.length === 1 && words[0] === "" ? 0 : words.length;
+  const tokenCount = useMemo(() => {
+    return countTokens(text);
   }, [text]);
 
   // Reset confirmation if text changes (e.g. reused component for next chunk after delete)
@@ -175,7 +174,7 @@ function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed
               Saved
             </div>
             <span className="text-xs text-silver-dark bg-silver-light/50 px-2 py-0.5 rounded-full">
-              {wordCount.toLocaleString()} words
+              {tokenCount.toLocaleString()} tokens
             </span>
             <svg
               className={`h-4 w-4 text-silver-dark transition-transform ${expanded ? "rotate-180" : ""}`}

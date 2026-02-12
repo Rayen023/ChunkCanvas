@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useAppStore } from "@/app/lib/store";
 import {
   DEFAULT_SEPARATORS,
+  ALL_AVAILABLE_SEPARATORS,
   DEFAULT_SEPARATOR_LABELS,
   DEFAULT_CHUNK_SIZE,
   DEFAULT_CHUNK_OVERLAP,
@@ -11,7 +12,7 @@ import {
 import { ChunkingParams as ChunkingParamsType } from "@/app/lib/types";
 
 /** All known separators the user can toggle on/off */
-const ALL_SEPARATORS = DEFAULT_SEPARATORS;
+const ALL_SEPARATORS = ALL_AVAILABLE_SEPARATORS;
 
 export default function ChunkingParams() {
   const chunkingParams = useAppStore((s) => s.chunkingParams);
@@ -19,12 +20,21 @@ export default function ChunkingParams() {
   const resetChunkingDefaults = useAppStore((s) => s.resetChunkingDefaults);
   const editedChunks = useAppStore((s) => s.editedChunks);
   const parsedContent = useAppStore((s) => s.parsedContent);
+  const parsedResults = useAppStore((s) => s.parsedResults);
   const [showCustom, setShowCustom] = useState(false);
   const [customSep, setCustomSep] = useState("");
 
   const maxContentLength = useMemo(() => {
-    return parsedContent ? parsedContent.length : 8192;
-  }, [parsedContent]);
+    let max = parsedContent ? parsedContent.length : 0;
+    if (parsedResults && parsedResults.length > 0) {
+      for (const res of parsedResults) {
+        if (res.content && res.content.length > max) {
+          max = res.content.length;
+        }
+      }
+    }
+    return max > 0 ? max : 8192;
+  }, [parsedContent, parsedResults]);
 
   /** Whether current params differ from defaults */
   const isModified = useMemo(() => {

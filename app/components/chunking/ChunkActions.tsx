@@ -63,6 +63,7 @@ export default function ChunkActions() {
       const config: ScriptConfig = {
         pipeline,
         chunkingParams,
+        filename: parsedFilename,
         openrouterModel,
         openrouterPrompt,
         pdfEngine,

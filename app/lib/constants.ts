@@ -168,19 +168,19 @@ export const CHUNKING_TYPE_LABELS: Record<string, string> = {
 
 /**
  * Default separators — ordered from coarsest to finest.
- * Prioritises keeping whole paragraphs and markdown tables intact:
- *   1. Double newline  → paragraph boundary
- *   2. Markdown heading → "# " / "## " / "### " level breaks
- *   3. Horizontal rule / thematic break → "---"
- *   4. Single newline  → line break (only when paragraph split isn't enough)
- *   5. Sentence end markers → ". ", "? ", "! "
- *   6. Space            → last resort word boundary
- *
- * Markdown table rows always start with "|" on each line, so they will
- * NOT be split as long as the table fits within a single chunk
- * (no separator matches inside a table row).
+ * By default, only paragraph breaks and headings are enabled.
  */
 export const DEFAULT_SEPARATORS = [
+  "\n\n",   // paragraph break
+  "\n# ",   // H1 heading
+  "\n## ",  // H2 heading
+  "\n### ", // H3 heading
+];
+
+/**
+ * All possible separators that can be toggled in the UI.
+ */
+export const ALL_AVAILABLE_SEPARATORS = [
   "\n\n",   // paragraph break
   "\n# ",   // H1 heading
   "\n## ",  // H2 heading
@@ -207,7 +207,7 @@ export const DEFAULT_SEPARATOR_LABELS: Record<string, string> = {
   " ":      "Word boundary (space)",
 };
 
-export const DEFAULT_SEPARATORS_DISPLAY = "\\n\\n, \\n# , \\n## , \\n### , \\n---, \\n, . , ? , ! ,  ";
+export const DEFAULT_SEPARATORS_DISPLAY = "\\n\\n, \\n# , \\n## , \\n### ";
 
 // ─── vLLM ─────────────────────────────────────────────────────────────────
 

@@ -379,6 +379,7 @@ export default function EmbeddingsSection() {
       const config: ScriptConfig = {
         pipeline,
         chunkingParams,
+        filename: parsedFilename,
         openrouterModel,
         openrouterPrompt,
         pdfEngine,

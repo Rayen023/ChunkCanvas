@@ -5,6 +5,7 @@ import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { PIPELINE } from "@/app/lib/constants";
 import ActionRow from "@/app/components/downloads/ActionRow";
 import type { ScriptConfig } from "@/app/lib/script-generator";
+import { countTokens } from "@/app/lib/tokenizer";
 
 /** Regex matching the file separator used during multi-file parsing: ═══ filename ═══ */
 const FILE_SEP_RE = /═══ (.+?) ═══/g;
@@ -136,10 +137,8 @@ export default function ParsedDocumentView() {
     userScrolledRef.current = !atBottom;
   }, [isParsing]);
 
-  const wordCount = useMemo(() => {
-    if (!parsedContent) return 0;
-    const words = parsedContent.trim().split(/\s+/);
-    return words.length === 1 && words[0] === "" ? 0 : words.length;
+  const tokenCount = useMemo(() => {
+    return countTokens(parsedContent);
   }, [parsedContent]);
 
   // Auto-resize textarea height
@@ -199,6 +198,7 @@ export default function ParsedDocumentView() {
       const config: ScriptConfig = {
         pipeline,
         chunkingParams,
+        filename: parsedFilename,
         openrouterModel,
         openrouterPrompt,
         pdfEngine,
@@ -214,10 +214,10 @@ export default function ParsedDocumentView() {
         pineconeRegion: env?.region,
       };
 
-      // "chunks" stage includes reading and chunking, which is appropriate for this step
-      const files = generatePipelineScript("chunks", config);
+      // "parsing" stage just includes reading and saving text
+      const files = generatePipelineScript("parsing", config);
       const stem = parsedFilename.replace(/\.[^.]+$/, "") || "document";
-      await downloadZip(files as unknown as Record<string, string>, `${stem}_chunks_pipeline.zip`);
+      await downloadZip(files as unknown as Record<string, string>, `${stem}_parsing_pipeline.zip`);
     } finally {
       setIsGeneratingScript(false);
     }
@@ -271,7 +271,7 @@ export default function ParsedDocumentView() {
             Saved
           </div>
           <span className="text-xs text-silver-dark bg-silver-light/50 px-2 py-0.5 rounded-full">
-            {wordCount.toLocaleString()} words
+            {tokenCount.toLocaleString()} tokens
           </span>
         </div>
       </div>

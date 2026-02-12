@@ -2,7 +2,7 @@
  * Script generator — produces pipeline.py + pyproject.toml + .env.example
  * as text strings that can be zipped client-side.
  *
- * Three stages: "chunks" | "embeddings" | "pinecone"
+ * Four stages: "parsing" | "chunks" | "embeddings" | "pinecone"
  */
 
 import { PIPELINE } from "./constants";
@@ -10,11 +10,12 @@ import type { ChunkingParams, EmbeddingProvider, PdfEngine } from "./types";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
-export type ScriptStage = "chunks" | "embeddings" | "pinecone";
+export type ScriptStage = "parsing" | "chunks" | "embeddings" | "pinecone";
 
 export interface ScriptConfig {
   pipeline: string;
   chunkingParams: ChunkingParams;
+  filename?: string;
   // OpenRouter extras
   openrouterModel?: string;
   openrouterPrompt?: string;
@@ -42,9 +43,12 @@ export interface ScriptConfig {
 
 function getDeps(pipeline: string, stage: ScriptStage, embeddingProvider?: EmbeddingProvider): string[] {
   const base = [
-    '"langchain-text-splitters>=0.2"',
     '"python-dotenv>=1.0"',
   ];
+
+  if (stage !== "parsing") {
+    base.push('"langchain-text-splitters>=0.2"');
+  }
 
   switch (pipeline) {
     case PIPELINE.SIMPLE_TEXT:
@@ -303,20 +307,67 @@ def chunk_text(text: str, filename: str) -> list[str]:
 
 // ─── Main Function Generators ─────────────────────────────────────────────
 
-function genMainChunks(isExcel: boolean): string {
+function genMainParsing(isExcel: boolean, defaultFilename?: string): string {
+  const sourceFile = defaultFilename ? JSON.stringify(defaultFilename) : '""';
+  const readCall = isExcel
+    ? `    rows = read_document(file_path)\n    content = "\\n".join(rows)`
+    : `    content = read_document(file_path)`;
+
+  return `
+import os
+
+# Configuration
+SOURCE_FILE = ${sourceFile}
+
+def main():
+    if not SOURCE_FILE:
+        print("Error: SOURCE_FILE is not configured. Please set the SOURCE_FILE variable in this script.")
+        return
+    if not os.path.exists(SOURCE_FILE):
+        print(f"Error: File '{SOURCE_FILE}' not found.")
+        return
+
+    file_path = SOURCE_FILE
+    filename = os.path.basename(file_path)
+    print(f"Processing {filename}...")
+
+${readCall}
+
+    out_path = os.path.splitext(filename)[0] + "_parsed.md"
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Saved parsed content to {out_path}")
+
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    main()
+`;
+}
+
+function genMainChunks(isExcel: boolean, defaultFilename?: string): string {
+  const sourceFile = defaultFilename ? JSON.stringify(defaultFilename) : '""';
   const chunkCall = isExcel
     ? `    rows = read_document(file_path)\n    chunks = chunk_rows(rows, filename)`
     : `    text = read_document(file_path)\n    chunks = chunk_text(text, filename)`;
 
   return `
-import argparse, json, os
+import json, os
+
+# Configuration
+SOURCE_FILE = ${sourceFile}
 
 def main():
-    parser = argparse.ArgumentParser(description="ChunkCanvas pipeline")
-    parser.add_argument("file", help="Path to document")
-    args = parser.parse_args()
-    file_path = args.file
+    if not SOURCE_FILE:
+        print("Error: SOURCE_FILE is not configured. Please set the SOURCE_FILE variable in this script.")
+        return
+    if not os.path.exists(SOURCE_FILE):
+        print(f"Error: File '{SOURCE_FILE}' not found.")
+        return
+
+    file_path = SOURCE_FILE
     filename = os.path.basename(file_path)
+    print(f"Processing {filename}...")
 
 ${chunkCall}
 
@@ -336,7 +387,16 @@ if __name__ == "__main__":
 `;
 }
 
-function genMainEmbeddings(embeddingProvider: EmbeddingProvider, voyageModel: string, cohereModel: string, openrouterEmbeddingModel: string, isExcel: boolean, embeddingDimensions?: number): string {
+function genMainEmbeddings(
+  embeddingProvider: EmbeddingProvider,
+  voyageModel: string,
+  cohereModel: string,
+  openrouterEmbeddingModel: string,
+  isExcel: boolean,
+  embeddingDimensions?: number,
+  defaultFilename?: string
+): string {
+  const sourceFile = defaultFilename ? JSON.stringify(defaultFilename) : '""';
   const chunkCall = isExcel
     ? `    rows = read_document(file_path)\n    chunks = chunk_rows(rows, filename)`
     : `    text = read_document(file_path)\n    chunks = chunk_text(text, filename)`;
@@ -384,14 +444,22 @@ function genMainEmbeddings(embeddingProvider: EmbeddingProvider, voyageModel: st
   }
 
   return `
-import argparse, json, os
+import json, os
+
+# Configuration
+SOURCE_FILE = ${sourceFile}
 
 def main():
-    parser = argparse.ArgumentParser(description="ChunkCanvas pipeline with embeddings")
-    parser.add_argument("file", help="Path to document")
-    args = parser.parse_args()
-    file_path = args.file
+    if not SOURCE_FILE:
+        print("Error: SOURCE_FILE is not configured. Please set the SOURCE_FILE variable in this script.")
+        return
+    if not os.path.exists(SOURCE_FILE):
+        print(f"Error: File '{SOURCE_FILE}' not found.")
+        return
+
+    file_path = SOURCE_FILE
     filename = os.path.basename(file_path)
+    print(f"Processing {filename}...")
 
 ${chunkCall}
 
@@ -428,7 +496,9 @@ function genMainPinecone(
   region: string,
   isExcel: boolean,
   embeddingDimensions?: number,
+  defaultFilename?: string
 ): string {
+  const sourceFile = defaultFilename ? JSON.stringify(defaultFilename) : '""';
   const chunkCall = isExcel
     ? `    rows = read_document(file_path)\n    chunks = chunk_rows(rows, filename)`
     : `    text = read_document(file_path)\n    chunks = chunk_text(text, filename)`;
@@ -529,14 +599,22 @@ function genMainPinecone(
   }
 
   return `
-import argparse, os
+import os
+
+# Configuration
+SOURCE_FILE = ${sourceFile}
 
 def main():
-    parser = argparse.ArgumentParser(description="ChunkCanvas pipeline → Pinecone")
-    parser.add_argument("file", help="Path to document")
-    args = parser.parse_args()
-    file_path = args.file
+    if not SOURCE_FILE:
+        print("Error: SOURCE_FILE is not configured. Please set the SOURCE_FILE variable in this script.")
+        return
+    if not os.path.exists(SOURCE_FILE):
+        print(f"Error: File '{SOURCE_FILE}' not found.")
+        return
+
+    file_path = SOURCE_FILE
     filename = os.path.basename(file_path)
+    print(f"Processing {filename}...")
 
 ${chunkCall}
 
@@ -570,7 +648,7 @@ pipeline = "pipeline:main"
 `;
 }
 
-// ─── .env.example Generator ───────────────────────────────────────────────
+// ─── .env Generator ───────────────────────────────────────────────────────
 
 function genEnvExample(pipeline: string, stage: ScriptStage, embeddingProvider?: EmbeddingProvider): string {
   const lines: string[] = [];
@@ -595,14 +673,14 @@ function genEnvExample(pipeline: string, stage: ScriptStage, embeddingProvider?:
 export interface GeneratedScript {
   "pipeline.py": string;
   "pyproject.toml": string;
-  ".env.example": string;
+  ".env": string;
 }
 
 export function generatePipelineScript(
   stage: ScriptStage,
   config: ScriptConfig,
 ): GeneratedScript {
-  const { pipeline, chunkingParams } = config;
+  const { pipeline, chunkingParams, filename } = config;
   const isSpreadsheet =
     pipeline === PIPELINE.EXCEL_SPREADSHEET ||
     pipeline === PIPELINE.CSV_SPREADSHEET;
@@ -649,14 +727,17 @@ export function generatePipelineScript(
   }
 
   // Build chunk function
-  const chunkFn = genChunkFunction(chunkingParams, isSpreadsheet);
+  const chunkFn = stage !== "parsing" ? genChunkFunction(chunkingParams, isSpreadsheet) : "";
 
   // Build main
   const embeddingProvider = config.embeddingProvider ?? "voyage";
   let mainFn: string;
   switch (stage) {
+    case "parsing":
+      mainFn = genMainParsing(isSpreadsheet, filename);
+      break;
     case "chunks":
-      mainFn = genMainChunks(isSpreadsheet);
+      mainFn = genMainChunks(isSpreadsheet, filename);
       break;
     case "embeddings":
       mainFn = genMainEmbeddings(
@@ -666,6 +747,7 @@ export function generatePipelineScript(
         config.openrouterEmbeddingModel ?? "qwen/qwen3-embedding-8b",
         isSpreadsheet,
         config.embeddingDimensions,
+        filename,
       );
       break;
     case "pinecone":
@@ -679,6 +761,7 @@ export function generatePipelineScript(
         config.pineconeRegion ?? "us-east-1",
         isSpreadsheet,
         config.embeddingDimensions,
+        filename,
       );
       break;
   }
@@ -696,6 +779,6 @@ ${mainFn}`;
   return {
     "pipeline.py": pipelinePy,
     "pyproject.toml": pyproject,
-    ".env.example": envExample,
+    ".env": envExample,
   };
 }
