@@ -1,15 +1,12 @@
 "use client";
 
 import { useAppStore } from "@/app/lib/store";
-import { useTheme } from "next-themes";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 
 /** Regex matching the file separator used during multi-file parsing: ═══ filename ═══ */
 const FILE_SEP_RE = /═══ (.+?) ═══/g;
 
 export default function ParsedDocumentView() {
-  const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
   const parsedContent = useAppStore((s) => s.parsedContent);
   const setParsedContent = useAppStore((s) => s.setParsedContent);
   const isParsing = useAppStore((s) => s.isParsing);
@@ -18,11 +15,6 @@ export default function ParsedDocumentView() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevLenRef = useRef(0);
   const userScrolledRef = useRef(false);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-  }, []);
 
   // ── Derive file sections from parsed content ───────────
   const fileSections = useMemo(() => {
@@ -125,6 +117,17 @@ export default function ParsedDocumentView() {
     return words.length === 1 && words[0] === "" ? 0 : words.length;
   }, [parsedContent]);
 
+  // Auto-resize textarea height
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    
+    // Reset height to auto to get correct scrollHeight for shrinking content
+    el.style.height = "auto";
+    const newHeight = Math.min(Math.max(el.scrollHeight + 2, 150), 600);
+    el.style.height = `${newHeight}px`;
+  }, [parsedContent]);
+
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setParsedContent(e.target.value);
     setShowSaved(true);
@@ -134,10 +137,18 @@ export default function ParsedDocumentView() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gunmetal">
-          {isParsing ? "Streaming Output" : "Parsed Document"}
-        </h2>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-gunmetal whitespace-nowrap">
+            {isParsing ? "Streaming Output" : "Parsed Document"}
+          </h2>
+          {!isParsing && (
+            <div className="flex items-center gap-1.5 text-xs text-silver-dark border-l border-silver-light/60 pl-3">
+              <span className="h-1 w-1 rounded-full bg-sandy" />
+              Changes auto-save as you edit
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {isParsing && (
             <div className="flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 animate-pulse">
@@ -203,11 +214,12 @@ export default function ParsedDocumentView() {
         onChange={handleChange}
         readOnly={isParsing}
         onScroll={handleScroll}
-        className={`parsed-document-textarea w-full h-[500px] rounded-xl border p-4 text-sm font-mono text-gunmetal-light resize-y focus:outline-none focus:ring-2 focus:ring-sandy/50 focus:border-sandy ${
+        className={`parsed-document-textarea w-full rounded-xl border p-4 text-sm font-mono text-gunmetal-light resize-y focus:outline-none focus:ring-2 focus:ring-sandy/50 focus:border-sandy overflow-y-auto ${
           isParsing
             ? "border-blue-200 cursor-default"
             : "border-silver-light"
         }`}
+        style={{ minHeight: "150px", maxHeight: "600px" }}
       />
     </div>
   );

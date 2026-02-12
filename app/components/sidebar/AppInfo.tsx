@@ -21,16 +21,16 @@ const STEPS = [
   },
   {
     num: 3,
-    title: "Review & Chunk",
-    short: "Inspect parsed text and split it into chunks.",
-    detail: "Adjust separators, chunk size, and overlap. The chunker uses LangChain's RecursiveCharacterTextSplitter.",
+    title: "Review Parsed Content",
+    short: "Inspect the parsed document.",
+    detail: "Verify the content extracted from your source files before chunking.",
     badge: null,
   },
   {
     num: 4,
-    title: "Edit & Download",
-    short: "Edit individual chunks, then export.",
-    detail: "Download chunks as JSON or generate a reproducible Python pipeline script (.zip).",
+    title: "Chunking",
+    short: "Configure chunking and view chunks.",
+    detail: "Select a chunking strategy, adjust parameters, and preview the resulting chunks.",
     badge: null,
   },
   {
@@ -58,15 +58,12 @@ function useActiveStep(): number {
   const embeddingsData = useAppStore((s) => s.embeddingsData);
   const scrollActiveStep = useAppStore((s) => s.scrollActiveStep);
 
-  // After embeddings → step 6 (Pinecone)
+  // If scrolling is active and tracking a step, prioritize it
+  if (scrollActiveStep) return scrollActiveStep;
+
+  // Fallback logic based on data presence
   if (embeddingsData && embeddingsData.length > 0) return 6;
-
-  // When chunks exist but no embeddings → use scroll detection (4 or 5)
-  if (editedChunks.length > 0) {
-    return scrollActiveStep ?? 4;
-  }
-
-  // Before chunks
+  if (editedChunks.length > 0) return 4;
   if (parsedContent) return 3;
   if (files.length > 0 && Object.values(pipelinesByExt).some(Boolean)) return 2;
   return 1;

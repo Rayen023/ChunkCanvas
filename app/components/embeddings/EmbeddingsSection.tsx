@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useAppStore } from "@/app/lib/store";
-import { VOYAGE_MODELS, EMBEDDING_MODELS, OPENROUTER_DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_ENDPOINT } from "@/app/lib/constants";
+import { VOYAGE_MODELS, COHERE_MODELS, EMBEDDING_MODELS, OPENROUTER_DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_ENDPOINT } from "@/app/lib/constants";
 import DownloadScriptButton from "../downloads/DownloadScriptButton";
 import type { EmbeddingsJson } from "@/app/lib/types";
 
@@ -50,6 +51,13 @@ export default function EmbeddingsSection() {
   const envVoyageKey = useAppStore((s) => s.envKeys.voyage);
   const setVoyageApiKey = useAppStore((s) => s.setVoyageApiKey);
   const setVoyageModel = useAppStore((s) => s.setVoyageModel);
+
+  // Cohere state
+  const cohereApiKey = useAppStore((s) => s.cohereApiKey);
+  const cohereModel = useAppStore((s) => s.cohereModel);
+  const envCohereKey = useAppStore((s) => s.envKeys.cohere);
+  const setCohereApiKey = useAppStore((s) => s.setCohereApiKey);
+  const setCohereModel = useAppStore((s) => s.setCohereModel);
 
   // OpenRouter state
   const openrouterApiKey = useAppStore((s) => s.openrouterApiKey);
@@ -110,6 +118,10 @@ export default function EmbeddingsSection() {
   useEffect(() => {
     if (!voyageApiKey && envVoyageKey) setVoyageApiKey(envVoyageKey);
   }, [voyageApiKey, envVoyageKey, setVoyageApiKey]);
+
+  useEffect(() => {
+    if (!cohereApiKey && envCohereKey) setCohereApiKey(envCohereKey);
+  }, [cohereApiKey, envCohereKey, setCohereApiKey]);
 
   useEffect(() => {
     if (!openrouterApiKey && envOpenrouterKey) setOpenrouterApiKey(envOpenrouterKey);
@@ -207,6 +219,9 @@ export default function EmbeddingsSection() {
     if (embeddingProvider === "voyage") {
       return VOYAGE_MODELS.find((m) => m.key === voyageModel)?.label ?? voyageModel;
     }
+    if (embeddingProvider === "cohere") {
+      return COHERE_MODELS.find((m) => m.key === cohereModel)?.label ?? cohereModel;
+    }
     if (embeddingProvider === "ollama") {
       return ollamaEmbeddingModel || "Ollama";
     }
@@ -214,24 +229,26 @@ export default function EmbeddingsSection() {
       return vllmEmbeddingModel || "vLLM";
     }
     return orEmbeddingModels.find((m) => m.id === openrouterEmbeddingModel)?.name ?? openrouterEmbeddingModel;
-  }, [embeddingProvider, voyageModel, openrouterEmbeddingModel, ollamaEmbeddingModel, vllmEmbeddingModel, orEmbeddingModels]);
+  }, [embeddingProvider, voyageModel, cohereModel, openrouterEmbeddingModel, ollamaEmbeddingModel, vllmEmbeddingModel, orEmbeddingModels]);
 
   // Can generate?
   const canGenerate = useMemo(() => {
     if (editedChunks.length === 0) return false;
     if (embeddingProvider === "voyage") return !!voyageApiKey;
+    if (embeddingProvider === "cohere") return !!cohereApiKey;
     if (embeddingProvider === "ollama") return !!ollamaEmbeddingModel;
     if (embeddingProvider === "vllm") return !!vllmEmbeddingModel;
     return !!openrouterApiKey;
-  }, [embeddingProvider, voyageApiKey, openrouterApiKey, ollamaEmbeddingModel, vllmEmbeddingModel, editedChunks.length]);
+  }, [embeddingProvider, voyageApiKey, cohereApiKey, openrouterApiKey, ollamaEmbeddingModel, vllmEmbeddingModel, editedChunks.length]);
 
   // The embedding model key for metadata
   const embeddingModelKey = useMemo(() => {
     if (embeddingProvider === "voyage") return voyageModel;
+    if (embeddingProvider === "cohere") return cohereModel;
     if (embeddingProvider === "ollama") return ollamaEmbeddingModel;
     if (embeddingProvider === "vllm") return vllmEmbeddingModel;
     return openrouterEmbeddingModel;
-  }, [embeddingProvider, voyageModel, openrouterEmbeddingModel, ollamaEmbeddingModel, vllmEmbeddingModel]);
+  }, [embeddingProvider, voyageModel, cohereModel, openrouterEmbeddingModel, ollamaEmbeddingModel, vllmEmbeddingModel]);
 
   // Generate embeddings
   const handleGenerate = useCallback(async () => {
@@ -246,6 +263,14 @@ export default function EmbeddingsSection() {
         const embeddings = await generateEmbeddings(
           voyageApiKey,
           voyageModel,
+          editedChunks,
+        );
+        setEmbeddingsData(embeddings);
+      } else if (embeddingProvider === "cohere") {
+        const { generateEmbeddings } = await import("@/app/lib/cohere");
+        const embeddings = await generateEmbeddings(
+          cohereApiKey,
+          cohereModel,
           editedChunks,
         );
         setEmbeddingsData(embeddings);
@@ -291,6 +316,7 @@ export default function EmbeddingsSection() {
   }, [
     canGenerate, embeddingProvider,
     voyageApiKey, voyageModel,
+    cohereApiKey, cohereModel,
     openrouterApiKey, openrouterEmbeddingModel,
     ollamaEmbeddingModel, ollamaEmbeddingEndpoint,
     vllmEmbeddingModel, vllmEmbeddingEndpoint,
@@ -343,45 +369,60 @@ export default function EmbeddingsSection() {
         <label className="block text-sm font-medium text-gunmetal mb-2">
           Embedding Provider
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setEmbeddingProvider("openrouter")}
-            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
               embeddingProvider === "openrouter"
-                ? "bg-sandy text-white border-sandy"
-                : "bg-card text-gunmetal border-silver hover:border-sandy"
+                ? "bg-sandy text-white border-sandy shadow-sm"
+                : "bg-card text-gunmetal border-silver hover:border-sandy hover:bg-sandy/4"
             }`}
           >
+            <Image src="/tech-icons/openrouter.svg" alt="" width={16} height={16} className={`h-4 w-4 ${embeddingProvider === "openrouter" ? "brightness-0 invert" : ""}`} />
             OpenRouter
           </button>
           <button
             onClick={() => setEmbeddingProvider("voyage")}
-            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
               embeddingProvider === "voyage"
-                ? "bg-sandy text-white border-sandy"
-                : "bg-card text-gunmetal border-silver hover:border-sandy"
+                ? "bg-sandy text-white border-sandy shadow-sm"
+                : "bg-card text-gunmetal border-silver hover:border-sandy hover:bg-sandy/4"
             }`}
           >
+            <Image src="/tech-icons/voyage-color.svg" alt="" width={16} height={16} className={`h-4 w-4 ${embeddingProvider === "voyage" ? "brightness-0 invert" : ""}`} />
             Voyage AI
           </button>
           <button
-            onClick={() => setEmbeddingProvider("ollama")}
-            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
-              embeddingProvider === "ollama"
-                ? "bg-sandy text-white border-sandy"
-                : "bg-card text-gunmetal border-silver hover:border-sandy"
+            onClick={() => setEmbeddingProvider("cohere")}
+            className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
+              embeddingProvider === "cohere"
+                ? "bg-sandy text-white border-sandy shadow-sm"
+                : "bg-card text-gunmetal border-silver hover:border-sandy hover:bg-sandy/4"
             }`}
           >
+            <Image src="/tech-icons/cohere-color.svg" alt="" width={16} height={16} className={`h-4 w-4 ${embeddingProvider === "cohere" ? "brightness-0 invert" : ""}`} />
+            Cohere
+          </button>
+          <button
+            onClick={() => setEmbeddingProvider("ollama")}
+            className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
+              embeddingProvider === "ollama"
+                ? "bg-sandy text-white border-sandy shadow-sm"
+                : "bg-card text-gunmetal border-silver hover:border-sandy hover:bg-sandy/4"
+            }`}
+          >
+            <Image src="/tech-icons/ollama.svg" alt="" width={16} height={16} className={`h-4 w-4 ${embeddingProvider === "ollama" ? "brightness-0 invert" : ""}`} />
             Ollama
           </button>
           <button
             onClick={() => setEmbeddingProvider("vllm")}
-            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
               embeddingProvider === "vllm"
-                ? "bg-sandy text-white border-sandy"
-                : "bg-card text-gunmetal border-silver hover:border-sandy"
+                ? "bg-sandy text-white border-sandy shadow-sm"
+                : "bg-card text-gunmetal border-silver hover:border-sandy hover:bg-sandy/4"
             }`}
           >
+            <Image src="/tech-icons/vllm-color.svg" alt="" width={16} height={16} className={`h-4 w-4 ${embeddingProvider === "vllm" ? "brightness-0 invert" : ""}`} />
             vLLM
           </button>
         </div>
@@ -467,6 +508,43 @@ export default function EmbeddingsSection() {
               className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none"
             >
               {VOYAGE_MODELS.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.label} — {m.description} ({m.dimensions}d)
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
+
+      {/* ── Cohere Embeddings ── */}
+      {embeddingProvider === "cohere" && (
+        <>
+          {/* API Key */}
+          <div>
+            <label className="block text-sm font-medium text-gunmetal mb-1">
+              Cohere API Key
+            </label>
+            <input
+              type="password"
+              value={cohereApiKey}
+              onChange={(e) => setCohereApiKey(e.target.value)}
+              placeholder="your-api-key"
+              className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+            />
+          </div>
+
+          {/* Cohere Model */}
+          <div>
+            <label className="block text-sm font-medium text-gunmetal mb-1">
+              Embedding Model
+            </label>
+            <select
+              value={cohereModel}
+              onChange={(e) => setCohereModel(e.target.value)}
+              className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none"
+            >
+              {COHERE_MODELS.map((m) => (
                 <option key={m.key} value={m.key}>
                   {m.label} — {m.description} ({m.dimensions}d)
                 </option>
@@ -704,7 +782,7 @@ export default function EmbeddingsSection() {
           <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
             Generated {embeddingsData.length} embeddings (
             {embeddingsData[0]?.length ?? 0} dimensions each) using{" "}
-            {embeddingProvider === "voyage" ? "Voyage AI" : embeddingProvider === "ollama" ? "Ollama" : embeddingProvider === "vllm" ? "vLLM" : "OpenRouter"}.
+            {embeddingProvider === "voyage" ? "Voyage AI" : embeddingProvider === "cohere" ? "Cohere" : embeddingProvider === "ollama" ? "Ollama" : embeddingProvider === "vllm" ? "vLLM" : "OpenRouter"}.
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

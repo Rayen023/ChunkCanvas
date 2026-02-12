@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, memo, useMemo, useEffect } from "react";
+import { useState, useCallback, memo, useMemo, useEffect, useRef } from "react";
 
 interface Props {
   index: number;
@@ -48,6 +48,20 @@ function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed
     setPrevText(text);
     setIsConfirming(false);
   }
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea height
+  useEffect(() => {
+    if (!expanded) return;
+    const el = textareaRef.current;
+    if (!el) return;
+    
+    // Reset height to auto to get correct scrollHeight for shrinking content
+    el.style.height = "auto";
+    const newHeight = Math.min(Math.max(el.scrollHeight + 2, 80), 400);
+    el.style.height = `${newHeight}px`;
+  }, [text, expanded]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -184,10 +198,11 @@ function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed
       {expanded && (
         <div className="px-4 pb-4">
           <textarea
+            ref={textareaRef}
             value={text}
             onChange={handleChange}
-            rows={10}
-            className={`w-full rounded-lg border border-silver px-3 py-2 text-sm font-mono text-gunmetal-light focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none resize-y ${
+            style={{ minHeight: "80px", maxHeight: "400px" }}
+            className={`w-full rounded-lg border border-silver px-3 py-2 text-sm font-mono text-gunmetal-light focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none resize-y overflow-y-auto ${
               isLightMode ? "!bg-[#fbfbfb]" : "dark:!bg-black/20"
             }`}
           />

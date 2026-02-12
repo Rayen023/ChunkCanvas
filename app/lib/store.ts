@@ -65,6 +65,8 @@ export interface AppState {
   embeddingProvider: EmbeddingProvider;
   voyageApiKey: string;
   voyageModel: string;
+  cohereApiKey: string;
+  cohereModel: string;
   openrouterEmbeddingModel: string;
   embeddingDimensions: number;
   ollamaEmbeddingModel: string;
@@ -99,6 +101,7 @@ export interface AppState {
   envKeys: {
     openrouter: string;
     voyage: string;
+    cohere: string;
     pinecone: string;
   };
   // ── Persisted user preferences (survive page reloads) ─────
@@ -165,6 +168,8 @@ export interface AppActions {
   setEmbeddingProvider: (provider: EmbeddingProvider) => void;
   setVoyageApiKey: (key: string) => void;
   setVoyageModel: (model: string) => void;
+  setCohereApiKey: (key: string) => void;
+  setCohereModel: (model: string) => void;
   setOpenrouterEmbeddingModel: (model: string) => void;
   setEmbeddingDimensions: (dims: number) => void;
   setOllamaEmbeddingModel: (model: string) => void;
@@ -271,6 +276,7 @@ export const useAppStore = create<AppState & AppActions>()(
   parsedResults: [],
   currentProcessingFile: "",
   chunkingParams: {
+    chunkingType: "recursive",
     separators: DEFAULT_SEPARATORS,
     chunkSize: DEFAULT_CHUNK_SIZE,
     chunkOverlap: DEFAULT_CHUNK_OVERLAP,
@@ -281,6 +287,8 @@ export const useAppStore = create<AppState & AppActions>()(
   embeddingProvider: "openrouter",
   voyageApiKey: "",
   voyageModel: "voyage-4",
+  cohereApiKey: "",
+  cohereModel: "embed-english-v3.0",
   openrouterEmbeddingModel: "qwen/qwen3-embedding-8b",
   embeddingDimensions: DEFAULT_EMBEDDING_DIMENSIONS,
   ollamaEmbeddingModel: "",
@@ -304,7 +312,7 @@ export const useAppStore = create<AppState & AppActions>()(
   sidebarCollapsed: false,
   sidebarWidth: 288,
   scrollActiveStep: null,
-  envKeys: { openrouter: "", voyage: "", pinecone: "" },
+  envKeys: { openrouter: "", voyage: "", cohere: "", pinecone: "" },
 
   // Persisted user preferences (initial empty — hydrated from localStorage)
   lastPipelineByExt: {},
@@ -376,7 +384,6 @@ export const useAppStore = create<AppState & AppActions>()(
         lastPipelineByExt: nextLastPipeline,
       };
     });
-    get().resetDownstream(2);
   },
   setConfigForExt: (ext, config) => {
     set((s) => {
@@ -460,6 +467,8 @@ export const useAppStore = create<AppState & AppActions>()(
   setEmbeddingProvider: (provider) => set({ embeddingProvider: provider, embeddingsData: null, embeddingError: null, lastEmbeddingProvider: provider }),
   setVoyageApiKey: (key) => set({ voyageApiKey: key }),
   setVoyageModel: (model) => set({ voyageModel: model }),
+  setCohereApiKey: (key) => set({ cohereApiKey: key }),
+  setCohereModel: (model) => set({ cohereModel: model }),
   setOpenrouterEmbeddingModel: (model) => set({ openrouterEmbeddingModel: model }),
   setEmbeddingDimensions: (dims) => set({ embeddingDimensions: dims }),
   setOllamaEmbeddingModel: (model) => set({ ollamaEmbeddingModel: model }),
@@ -501,6 +510,7 @@ export const useAppStore = create<AppState & AppActions>()(
   resetChunkingDefaults: () =>
     set({
       chunkingParams: {
+        chunkingType: "recursive",
         separators: DEFAULT_SEPARATORS,
         chunkSize: DEFAULT_CHUNK_SIZE,
         chunkOverlap: DEFAULT_CHUNK_OVERLAP,
@@ -550,6 +560,8 @@ export const useAppStore = create<AppState & AppActions>()(
       embeddingProvider: s.lastEmbeddingProvider || "openrouter",
       voyageApiKey: s.envKeys.voyage || s.voyageApiKey || "",
       voyageModel: s.voyageModel || "voyage-4",
+      cohereApiKey: s.envKeys.cohere || s.cohereApiKey || "",
+      cohereModel: s.cohereModel || "embed-english-v3.0",
       openrouterEmbeddingModel: s.openrouterEmbeddingModel || "qwen/qwen3-embedding-8b",
       embeddingDimensions: s.embeddingDimensions || DEFAULT_EMBEDDING_DIMENSIONS,
       ollamaEmbeddingModel: s.ollamaEmbeddingModel || "",
@@ -654,6 +666,7 @@ export const useAppStore = create<AppState & AppActions>()(
         // Embedding settings
         embeddingProvider: state.embeddingProvider,
         voyageModel: state.voyageModel,
+        cohereModel: state.cohereModel,
         openrouterEmbeddingModel: state.openrouterEmbeddingModel,
         embeddingDimensions: state.embeddingDimensions,
         ollamaEmbeddingModel: state.ollamaEmbeddingModel,
@@ -709,7 +722,7 @@ export const useAppStore = create<AppState & AppActions>()(
           pineconeSuccess: null,
           allChunksCollapsed: false,
           scrollActiveStep: null,
-          envKeys: { openrouter: "", voyage: "", pinecone: "" },
+          envKeys: { openrouter: "", voyage: "", cohere: "", pinecone: "" },
         };
       },
     },

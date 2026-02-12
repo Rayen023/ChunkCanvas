@@ -26,6 +26,8 @@ export interface ScriptConfig {
   embeddingProvider?: EmbeddingProvider;
   // Voyage model (for embeddings/pinecone)
   voyageModel?: string;
+  // Cohere model
+  cohereModel?: string;
   // OpenRouter embedding model
   openrouterEmbeddingModel?: string;
   // Embedding dimensions (shared across providers)
@@ -67,7 +69,10 @@ function getDeps(pipeline: string, stage: ScriptStage, embeddingProvider?: Embed
   if (stage === "embeddings" || stage === "pinecone") {
     if (embeddingProvider === "openrouter") {
       base.push('"httpx>=0.27"');
+    } else if (embeddingProvider === "cohere") {
+      base.push('"langchain-cohere>=0.1.0"');
     } else {
+      // Default to Voyage or other providers
       base.push('"langchain-voyageai>=0.0.3"');
     }
   }
@@ -331,12 +336,15 @@ if __name__ == "__main__":
 `;
 }
 
-function genMainEmbeddings(embeddingProvider: EmbeddingProvider, voyageModel: string, openrouterEmbeddingModel: string, isExcel: boolean, embeddingDimensions?: number): string {
+function genMainEmbeddings(embeddingProvider: EmbeddingProvider, voyageModel: string, cohereModel: string, openrouterEmbeddingModel: string, isExcel: boolean, embeddingDimensions?: number): string {
   const chunkCall = isExcel
     ? `    rows = read_document(file_path)\n    chunks = chunk_rows(rows, filename)`
     : `    text = read_document(file_path)\n    chunks = chunk_text(text, filename)`;
 
-  const modelName = embeddingProvider === "openrouter" ? openrouterEmbeddingModel : voyageModel;
+  let modelName: string;
+  if (embeddingProvider === "openrouter") modelName = openrouterEmbeddingModel;
+  else if (embeddingProvider === "cohere") modelName = cohereModel;
+  else modelName = voyageModel;
 
   const dimsPayload = embeddingDimensions && embeddingDimensions > 0
     ? `\n    DIMENSIONS = ${embeddingDimensions}`
@@ -345,8 +353,9 @@ function genMainEmbeddings(embeddingProvider: EmbeddingProvider, voyageModel: st
     ? `, "dimensions": DIMENSIONS`
     : "";
 
-  const embedSection = embeddingProvider === "openrouter"
-    ? `    import httpx
+  let embedSection = "";
+  if (embeddingProvider === "openrouter") {
+    embedSection = `    import httpx
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     model = ${JSON.stringify(openrouterEmbeddingModel)}
     BATCH_SIZE = 128${dimsPayload}
@@ -363,10 +372,16 @@ function genMainEmbeddings(embeddingProvider: EmbeddingProvider, voyageModel: st
         resp.raise_for_status()
         data = sorted(resp.json()["data"], key=lambda x: x.get("index", 0))
         embeddings.extend([d["embedding"] for d in data])
-        print(f"  Batch {i//BATCH_SIZE + 1} done ({len(embeddings)}/{len(chunks)})")`
-    : `    from langchain_voyageai import VoyageAIEmbeddings
+        print(f"  Batch {i//BATCH_SIZE + 1} done ({len(embeddings)}/{len(chunks)})")`;
+  } else if (embeddingProvider === "cohere") {
+    embedSection = `    from langchain_cohere import CohereEmbeddings
+    embedder = CohereEmbeddings(model=${JSON.stringify(cohereModel)})
+    embeddings = embedder.embed_documents(chunks)`;
+  } else {
+    embedSection = `    from langchain_voyageai import VoyageAIEmbeddings
     embedder = VoyageAIEmbeddings(model=${JSON.stringify(voyageModel)})
     embeddings = embedder.embed_documents(chunks)`;
+  }
 
   return `
 import argparse, json, os
@@ -406,6 +421,7 @@ if __name__ == "__main__":
 function genMainPinecone(
   embeddingProvider: EmbeddingProvider,
   voyageModel: string,
+  cohereModel: string,
   openrouterEmbeddingModel: string,
   indexName: string,
   cloud: string,
@@ -424,8 +440,9 @@ function genMainPinecone(
     ? `, "dimensions": DIMENSIONS`
     : "";
 
-  const embedSection = embeddingProvider === "openrouter"
-    ? `    import httpx
+  let embedSection = "";
+  if (embeddingProvider === "openrouter") {
+    embedSection = `    import httpx
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     emb_model = ${JSON.stringify(openrouterEmbeddingModel)}
     BATCH_SIZE = 128${dimsPayload}
@@ -466,8 +483,30 @@ function genMainPinecone(
                for i, (t, e) in enumerate(zip(chunks, all_embeddings))]
     for i in range(0, len(vectors), 100):
         index.upsert(vectors=vectors[i:i+100])
-    print(f"Uploaded {len(vectors)} chunks to Pinecone index: {index_name}")`
-    : `    from langchain_voyageai import VoyageAIEmbeddings
+    print(f"Uploaded {len(vectors)} chunks to Pinecone index: {index_name}")`;
+  } else if (embeddingProvider === "cohere") {
+    embedSection = `    from langchain_cohere import CohereEmbeddings
+    from langchain_core.documents import Document
+    from langchain_pinecone import PineconeVectorStore
+    from pinecone import Pinecone, ServerlessSpec
+
+    embedder = CohereEmbeddings(model=${JSON.stringify(cohereModel)})
+    pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
+
+    index_name = ${JSON.stringify(indexName)}
+    existing = [idx.name for idx in pc.list_indexes()]
+    if index_name not in existing:
+        pc.create_index(
+            name=index_name, dimension=1024, metric="cosine",
+            spec=ServerlessSpec(cloud=${JSON.stringify(cloud)}, region=${JSON.stringify(region)})
+        )
+        print(f"Created index: {index_name}")
+
+    docs = [Document(page_content=t, metadata={"filename": filename}) for t in chunks]
+    vectorstore = PineconeVectorStore.from_documents(docs, embedder, index_name=index_name)
+    print(f"Uploaded {len(docs)} chunks to Pinecone index: {index_name}")`;
+  } else {
+    embedSection = `    from langchain_voyageai import VoyageAIEmbeddings
     from langchain_core.documents import Document
     from langchain_pinecone import PineconeVectorStore
     from pinecone import Pinecone, ServerlessSpec
@@ -487,6 +526,7 @@ function genMainPinecone(
     docs = [Document(page_content=t, metadata={"filename": filename}) for t in chunks]
     vectorstore = PineconeVectorStore.from_documents(docs, embedder, index_name=index_name)
     print(f"Uploaded {len(docs)} chunks to Pinecone index: {index_name}")`;
+  }
 
   return `
 import argparse, os
@@ -537,8 +577,12 @@ function genEnvExample(pipeline: string, stage: ScriptStage, embeddingProvider?:
   if (pipeline.startsWith("OpenRouter") || embeddingProvider === "openrouter") {
     lines.push("OPENROUTER_API_KEY=");
   }
-  if ((stage === "embeddings" || stage === "pinecone") && embeddingProvider !== "openrouter") {
-    lines.push("VOYAGEAI_API_KEY=");
+  if ((stage === "embeddings" || stage === "pinecone")) {
+    if (embeddingProvider === "cohere") {
+      lines.push("COHERE_API_KEY=");
+    } else if (embeddingProvider === "voyage") {
+      lines.push("VOYAGEAI_API_KEY=");
+    }
   }
   if (stage === "pinecone") {
     lines.push("PINECONE_API_KEY=");
@@ -618,6 +662,7 @@ export function generatePipelineScript(
       mainFn = genMainEmbeddings(
         embeddingProvider,
         config.voyageModel ?? "voyage-4",
+        config.cohereModel ?? "embed-english-v3.0",
         config.openrouterEmbeddingModel ?? "qwen/qwen3-embedding-8b",
         isSpreadsheet,
         config.embeddingDimensions,
@@ -627,6 +672,7 @@ export function generatePipelineScript(
       mainFn = genMainPinecone(
         embeddingProvider,
         config.voyageModel ?? "voyage-4",
+        config.cohereModel ?? "embed-english-v3.0",
         config.openrouterEmbeddingModel ?? "qwen/qwen3-embedding-8b",
         config.pineconeIndexName ?? "chunkcanvas",
         config.pineconeCloud ?? "aws",

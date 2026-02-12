@@ -11,20 +11,23 @@ export default function EnvLoader() {
   const setEnvKeys = useAppStore((s) => s.setEnvKeys);
   const setOpenrouterApiKey = useAppStore((s) => s.setOpenrouterApiKey);
   const setVoyageApiKey = useAppStore((s) => s.setVoyageApiKey);
+  const setCohereApiKey = useAppStore((s) => s.setCohereApiKey);
   const setPineconeApiKey = useAppStore((s) => s.setPineconeApiKey);
 
   useEffect(() => {
     const or = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY ?? "";
     const va = process.env.NEXT_PUBLIC_VOYAGEAI_API_KEY ?? "";
+    const co = process.env.NEXT_PUBLIC_COHERE_API_KEY ?? "";
     const pc = process.env.NEXT_PUBLIC_PINECONE_API_KEY ?? "";
 
-    setEnvKeys({ openrouter: or, voyage: va, pinecone: pc });
+    setEnvKeys({ openrouter: or, voyage: va, cohere: co, pinecone: pc });
 
     // Pre-fill if not already set
     if (or) setOpenrouterApiKey(or);
     if (va) setVoyageApiKey(va);
+    if (co) setCohereApiKey(co);
     if (pc) setPineconeApiKey(pc);
-  }, [setEnvKeys, setOpenrouterApiKey, setVoyageApiKey, setPineconeApiKey]);
+  }, [setEnvKeys, setOpenrouterApiKey, setVoyageApiKey, setCohereApiKey, setPineconeApiKey]);
 
   return null;
 }

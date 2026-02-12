@@ -57,7 +57,7 @@ export interface OpenRouterModelFull extends OpenRouterModel {
 
 // ─── Embedding Provider ──────────────────────────────────────────────────
 
-export type EmbeddingProvider = "voyage" | "openrouter" | "ollama" | "vllm";
+export type EmbeddingProvider = "voyage" | "openrouter" | "ollama" | "vllm" | "cohere";
 
 // ─── PDF Engine ───────────────────────────────────────────────────────────
 
@@ -78,6 +78,15 @@ export interface VoyageModel {
   description: string;
 }
 
+// ─── Cohere Model ────────────────────────────────────────────────────────
+
+export interface CohereModel {
+  key: string;
+  label: string;
+  dimensions: number;
+  description: string;
+}
+
 // ─── Pinecone Environment ────────────────────────────────────────────────
 
 export interface PineconeEnvironment {
@@ -89,7 +98,10 @@ export interface PineconeEnvironment {
 
 // ─── Chunking Parameters ─────────────────────────────────────────────────
 
+export type ChunkingType = "recursive" | "parent-child";
+
 export interface ChunkingParams {
+  chunkingType: ChunkingType;
   separators: string[];
   chunkSize: number;
   chunkOverlap: number;

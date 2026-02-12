@@ -42,18 +42,10 @@ export default function Home() {
   const parseError = useAppStore((s) => s.parseError);
   const isChunking = useAppStore((s) => s.isChunking);
   const openrouterApiKey = useAppStore((s) => s.openrouterApiKey);
+  const chunkingParams = useAppStore((s) => s.chunkingParams);
+  const parsedResults = useAppStore((s) => s.parsedResults);
 
   const [parsingTimer, setParsingTimer] = useState(0);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isParsing) {
-      interval = setInterval(() => {
-        setParsingTimer((t) => t + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isParsing]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -63,92 +55,15 @@ export default function Home() {
 
   const abortRef = useRef<AbortController | null>(null);
 
-  // ── Scroll-based step detection between steps 4 and 5 ────
-  const setScrollActiveStep = useAppStore((s) => s.setScrollActiveStep);
-  const embeddingsData = useAppStore((s) => s.embeddingsData);
-
-  useEffect(() => {
-    // Only enable scroll detection when chunks exist but no embeddings
-    const hasChunks = editedChunks.length > 0;
-    const hasEmbeddings = embeddingsData && embeddingsData.length > 0;
-
-    if (!hasChunks || hasEmbeddings) {
-      setScrollActiveStep(null);
-      return;
-    }
-
-    const step4El = document.getElementById("step-4");
-    const step5El = document.getElementById("step-5");
-    if (!step4El || !step5El) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Find the most visible section
-        let bestStep: number | null = null;
-        let bestRatio = 0;
-        for (const entry of entries) {
-          const stepNum = entry.target.id === "step-4" ? 4 : 5;
-          if (entry.isIntersecting && entry.intersectionRatio > bestRatio) {
-            bestRatio = entry.intersectionRatio;
-            bestStep = stepNum;
-          }
-        }
-        if (bestStep !== null) {
-          setScrollActiveStep(bestStep);
-        }
-      },
-      { threshold: [0, 0.25, 0.5, 0.75, 1] },
-    );
-
-    observer.observe(step4El);
-    observer.observe(step5El);
-
-    // Also set initial value based on what's visible
-    const step5Rect = step5El.getBoundingClientRect();
-    const inView = step5Rect.top < window.innerHeight && step5Rect.bottom > 0;
-    setScrollActiveStep(inView ? 5 : 4);
-
-    return () => observer.disconnect();
-  }, [editedChunks.length, embeddingsData, setScrollActiveStep]);
-
-  const pipelinesByExt = useAppStore((s) => s.pipelinesByExt);
-
-  /** Unique set of file extensions present in uploaded files */
-  const fileExts = useMemo(() => {
-    const exts = new Set<string>();
-    for (const f of files) {
-      exts.add(f.name.split(".").pop()?.toLowerCase() ?? "");
-    }
-    return exts;
-  }, [files]);
-
-  /** All pipelines currently selected across extension groups */
-  const selectedPipelines = useMemo(
-    () => Object.values(pipelinesByExt).filter(Boolean),
-    [pipelinesByExt],
-  );
-
-  /** Whether every extension has a pipeline selected */
-  const allExtsCovered = useMemo(
-    () => fileExts.size > 0 && [...fileExts].every((ext) => !!pipelinesByExt[ext]),
-    [fileExts, pipelinesByExt],
-  );
-
-  const needsOpenRouter = selectedPipelines.some((p) => p.startsWith("OpenRouter"));
-
-  const canProcess =
-    files.length > 0 &&
-    allExtsCovered &&
-    !isParsing &&
-    (needsOpenRouter ? !!openrouterApiKey : true);
-
   // ── Cancel Processing ───────────────────────────────────────
   const handleCancel = useCallback(() => {
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
       const state = useAppStore.getState();
-      state.setIsParsing(false);      state.setParseProgress(0, "");      state.setParseError("Processing cancelled by user");
+      state.setIsParsing(false);
+      state.setParseProgress(0, "");
+      state.setParseError("Processing cancelled by user");
     }
   }, []);
 
@@ -165,10 +80,9 @@ export default function Home() {
     state.setIsParsing(true);
     state.setParseError(null);
     state.setParseProgress(0, "Initializing...");
-    state.resetDownstream(3);
+    state.resetDownstream(2);
     state.setParsedResults([]);
 
-    // Any file using a local-streaming pipeline?
     const anyLocalPdf = Object.values(state.pipelinesByExt).some(
       (p) => p === PIPELINE.OLLAMA_PDF || p === PIPELINE.VLLM_PDF,
     );
@@ -197,9 +111,7 @@ export default function Home() {
         `[${fileIdx + 1}/${totalFiles}] ${currentFile.name}`,
       );
 
-      const isLocalPdf =
-        filePipeline === PIPELINE.OLLAMA_PDF ||
-        filePipeline === PIPELINE.VLLM_PDF;
+      const isLocalPdf = filePipeline === PIPELINE.OLLAMA_PDF || filePipeline === PIPELINE.VLLM_PDF;
       const streamingPages: Map<number, string> = new Map();
 
       try {
@@ -236,13 +148,9 @@ export default function Home() {
                 const currentFileContent = sorted.join("\n\n");
                 const allContent = [
                   ...parsedResults.map((r) =>
-                    totalFiles > 1
-                      ? `\n═══ ${r.filename} ═══\n${r.content}`
-                      : r.content,
+                    totalFiles > 1 ? `\n═══ ${r.filename} ═══\n${r.content}` : r.content,
                   ),
-                  totalFiles > 1
-                    ? `\n═══ ${currentFile.name} ═══\n${currentFileContent}`
-                    : currentFileContent,
+                  totalFiles > 1 ? `\n═══ ${currentFile.name} ═══\n${currentFileContent}` : currentFileContent,
                 ].join("\n\n");
                 state.setParsedContent(allContent);
               }
@@ -256,13 +164,8 @@ export default function Home() {
           pipeline: filePipeline,
         });
 
-        // Update combined content after each file
         const combinedContent = parsedResults
-          .map((r) =>
-            totalFiles > 1
-              ? `\n═══ ${r.filename} ═══\n${r.content}`
-              : r.content,
-          )
+          .map((r) => (totalFiles > 1 ? `\n═══ ${r.filename} ═══\n${r.content}` : r.content))
           .join("\n\n");
         state.setParsedContent(combinedContent);
         state.setParsedResults([...parsedResults]);
@@ -275,21 +178,12 @@ export default function Home() {
       }
     }
 
-    // Final state
     if (parsedResults.length > 0) {
-      state.setParsedFilename(
-        totalFiles === 1
-          ? parsedResults[0].filename
-          : `${parsedResults.length} files`,
-      );
+      state.setParsedFilename(totalFiles === 1 ? parsedResults[0].filename : `${parsedResults.length} files`);
       const uniquePipelines = [...new Set(parsedResults.map((r) => r.pipeline))];
-      state.setParsedDocType(
-        uniquePipelines.length === 1 ? uniquePipelines[0] : "Mixed pipelines",
-      );
+      state.setParsedDocType(uniquePipelines.length === 1 ? uniquePipelines[0] : "Mixed pipelines");
 
-      const allExcelRows = parsedResults
-        .filter((r) => r.excelRows)
-        .flatMap((r) => r.excelRows!);
+      const allExcelRows = parsedResults.filter((r) => r.excelRows).flatMap((r) => r.excelRows!);
       if (allExcelRows.length > 0) {
         state.setParsedExcelRows(allExcelRows);
       }
@@ -310,41 +204,25 @@ export default function Home() {
 
     try {
       const { chunkText, chunkExcelRows } = await import("@/app/lib/chunking");
-
       const allChunks: string[] = [];
       const allSourceFiles: string[] = [];
 
       if (results.length > 0) {
-        // Multi-file: chunk each file independently (ensures file boundaries)
         for (const result of results) {
           let fileChunks: string[];
           if (
-            (result.pipeline === PIPELINE.EXCEL_SPREADSHEET ||
-              result.pipeline === PIPELINE.CSV_SPREADSHEET) &&
+            (result.pipeline === PIPELINE.EXCEL_SPREADSHEET || result.pipeline === PIPELINE.CSV_SPREADSHEET) &&
             result.excelRows
           ) {
-            fileChunks = await chunkExcelRows(
-              result.excelRows,
-              state.chunkingParams,
-              result.filename,
-            );
+            fileChunks = await chunkExcelRows(result.excelRows, state.chunkingParams, result.filename);
           } else {
-            fileChunks = await chunkText(
-              result.content,
-              state.chunkingParams,
-              result.filename,
-            );
+            fileChunks = await chunkText(result.content, state.chunkingParams, result.filename);
           }
           allChunks.push(...fileChunks);
           allSourceFiles.push(...fileChunks.map(() => result.filename));
         }
       } else {
-        // Fallback: single parsedContent
-        const chunks = await chunkText(
-          state.parsedContent!,
-          state.chunkingParams,
-          state.parsedFilename,
-        );
+        const chunks = await chunkText(state.parsedContent!, state.chunkingParams, state.parsedFilename);
         allChunks.push(...chunks);
         allSourceFiles.push(...chunks.map(() => state.parsedFilename));
       }
@@ -358,6 +236,92 @@ export default function Home() {
     }
   }, []);
 
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isParsing) {
+      interval = setInterval(() => {
+        setParsingTimer((t) => t + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isParsing]);
+
+  // ── Scroll-based step detection ────────────────────────────
+  const setScrollActiveStep = useAppStore((s) => s.setScrollActiveStep);
+  const embeddingsData = useAppStore((s) => s.embeddingsData);
+
+  useEffect(() => {
+    // Only activate scroll detection if we have content
+    if (!parsedContent) {
+      setScrollActiveStep(null);
+      return;
+    }
+
+    const stepIds = ["step-3", "step-4", "step-5", "step-6"];
+    const elements = stepIds.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
+
+    if (elements.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // We want to find the visible step that is "most" on screen or highest up
+        // Simple logic: find the one with highest intersection ratio
+        let bestStep: number | null = null;
+        let bestRatio = 0;
+
+        for (const entry of entries) {
+          const id = entry.target.id;
+          const stepNum = parseInt(id.replace("step-", ""), 10);
+          if (entry.isIntersecting && entry.intersectionRatio > bestRatio) {
+            bestRatio = entry.intersectionRatio;
+            bestStep = stepNum;
+          }
+        }
+        
+        if (bestStep !== null) {
+          setScrollActiveStep(bestStep);
+        }
+      },
+      { threshold: [0, 0.25, 0.5, 0.75, 1] },
+    );
+
+    elements.forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, [parsedContent, editedChunks.length, embeddingsData, setScrollActiveStep]);
+
+  // ── Live Chunking ──────────────────────────────────────────
+  useEffect(() => {
+    if ((parsedContent || parsedResults.length > 0) && !isParsing) {
+      const timer = setTimeout(() => {
+        handleChunk();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [chunkingParams, parsedResults, parsedContent, isParsing, handleChunk]);
+
+  const pipelinesByExt = useAppStore((s) => s.pipelinesByExt);
+
+  const fileExts = useMemo(() => {
+    const exts = new Set<string>();
+    for (const f of files) {
+      exts.add(f.name.split(".").pop()?.toLowerCase() ?? "");
+    }
+    return exts;
+  }, [files]);
+
+  const selectedPipelines = useMemo(() => Object.values(pipelinesByExt).filter(Boolean), [pipelinesByExt]);
+
+  const allExtsCovered = useMemo(
+    () => fileExts.size > 0 && [...fileExts].every((ext) => !!pipelinesByExt[ext]),
+    [fileExts, pipelinesByExt],
+  );
+
+  const needsOpenRouter = selectedPipelines.some((p) => p.startsWith("OpenRouter"));
+
+  const canProcess =
+    files.length > 0 && allExtsCovered && !isParsing && (needsOpenRouter ? !!openrouterApiKey : true);
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-8 space-y-8">
       {/* ── Mobile Header ──────────────────────────────── */}
@@ -365,9 +329,7 @@ export default function Home() {
         <div className="h-8 w-8 rounded-lg bg-sandy flex items-center justify-center text-white font-bold text-sm">
           CC
         </div>
-        <span className="text-lg font-semibold text-gunmetal">
-          ChunkCanvas
-        </span>
+        <span className="text-lg font-semibold text-gunmetal">ChunkCanvas</span>
       </div>
 
       {/* ═══════ STEP 1 — Upload Files ═══════ */}
@@ -378,7 +340,6 @@ export default function Home() {
           </span>
           Upload Files
         </h2>
-
         <FileUploader />
       </section>
 
@@ -391,50 +352,22 @@ export default function Home() {
             </span>
             Select Pipeline, Configure &amp; Parse
           </h2>
-
           <PipelineSelector />
-
-          {/* Progress bar */}
           {isParsing && (
-            <ProgressBar
-              progress={parseProgress}
-              message={parseProgressMsg}
-              timer={formatTime(parsingTimer)}
-            />
+            <ProgressBar progress={parseProgress} message={parseProgressMsg} timer={formatTime(parsingTimer)} />
           )}
-
-          {/* Error */}
           {parseError && (
-            <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-              {parseError}
-            </div>
+            <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{parseError}</div>
           )}
-
-          {/* Process / Cancel buttons */}
           {isParsing ? (
             <div className="flex gap-2">
               <button
                 disabled
                 className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-sandy px-4 py-3 text-sm font-medium text-white opacity-75 cursor-not-allowed"
               >
-                <svg
-                  className="h-4 w-4 animate-spin"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
                 Processing…
               </button>
@@ -457,78 +390,49 @@ export default function Home() {
         </section>
       )}
 
-      {/* ═══════ STEP 3 — Parsed Document & Chunking ═══════ */}
-      {(parsedContent !== null) && (
+      {/* ═══════ STEP 3 — Review Parsed Content ═══════ */}
+      {parsedContent !== null && (
         <section id="step-3" className="bg-card rounded-xl shadow-sm border border-silver-light p-6 space-y-5">
           <h2 className="text-lg font-semibold text-gunmetal">
             <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-sandy text-white text-xs font-bold mr-2">
               3
             </span>
-            {isParsing ? "Live Preview" : "Review & Chunk"}
+            Review Parsed Content
           </h2>
-
           <ParsedDocumentView />
-
-          <div className="h-px bg-silver-light" />
-
-          <ChunkingParams />
-
-          <button
-            onClick={handleChunk}
-            disabled={isChunking}
-            className="w-full flex items-center justify-center gap-2 rounded-lg bg-sandy px-4 py-3 text-sm font-medium text-white hover:bg-sandy-light active:bg-sandy-dark disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-          >
-            {isChunking ? (
-              <>
-                <svg
-                  className="h-4 w-4 animate-spin"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
-                Chunking…
-              </>
-            ) : (
-              `Chunk Document${files.length > 1 ? "s" : ""}`
-            )}
-          </button>
         </section>
       )}
 
-      {/* ═══════ STEP 4 — Editable Chunks ═══════ */}
-      {editedChunks.length > 0 && (
+      {/* ═══════ STEP 4 — Chunking Configuration & Preview ═══════ */}
+      {parsedContent !== null && (
         <section id="step-4" className="bg-card rounded-xl shadow-sm border border-silver-light p-6 space-y-5">
           <h2 className="text-lg font-semibold text-gunmetal">
             <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-sandy text-white text-xs font-bold mr-2">
               4
             </span>
-            Edit Chunks &amp; Download
+            Chunking Configuration &amp; Preview
           </h2>
-
-          <ChunkList />
-
-          <div className="h-px bg-silver-light" />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <DownloadJsonButton />
-            <DownloadScriptButton
-              stage="chunks"
-              label="Download Pipeline Script (.zip)"
-            />
-          </div>
+          <ChunkingParams />
+          {isChunking && (
+            <div className="flex items-center justify-center gap-2 py-2 text-xs text-silver-dark italic">
+              <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Updating chunks...
+            </div>
+          )}
+          {editedChunks.length > 0 && (
+            <>
+              <div className="h-px bg-silver-light" />
+              <ChunkList />
+              <div className="h-px bg-silver-light" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <DownloadJsonButton />
+                <DownloadScriptButton stage="chunks" label="Download Pipeline Script (.zip)" />
+              </div>
+            </>
+          )}
         </section>
       )}
 

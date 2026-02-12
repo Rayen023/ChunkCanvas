@@ -21,6 +21,7 @@ export default function DownloadScriptButton({ stage, label }: Props) {
   const excelSheet = useAppStore((s) => s.excelSheet);
   const embeddingProvider = useAppStore((s) => s.embeddingProvider);
   const voyageModel = useAppStore((s) => s.voyageModel);
+  const cohereModel = useAppStore((s) => s.cohereModel);
   const openrouterEmbeddingModel = useAppStore((s) => s.openrouterEmbeddingModel);
   const embeddingDimensions = useAppStore((s) => s.embeddingDimensions);
   const pineconeIndexName = useAppStore((s) => s.pineconeIndexName);
@@ -52,6 +53,7 @@ export default function DownloadScriptButton({ stage, label }: Props) {
         excelSheet: isSpreadsheet ? excelSheet : undefined,
         embeddingProvider,
         voyageModel,
+        cohereModel,
         openrouterEmbeddingModel,
         embeddingDimensions,
         pineconeIndexName,
@@ -68,7 +70,7 @@ export default function DownloadScriptButton({ stage, label }: Props) {
   }, [
     pipeline, chunkingParams, parsedFilename, openrouterModel,
     openrouterPrompt, pdfEngine, excelColumn, excelSheet,
-    embeddingProvider, voyageModel, openrouterEmbeddingModel, embeddingDimensions,
+    embeddingProvider, voyageModel, cohereModel, openrouterEmbeddingModel, embeddingDimensions,
     pineconeIndexName, pineconeEnvKey, stage,
   ]);
 

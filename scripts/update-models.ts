@@ -55,6 +55,16 @@ const VOYAGE_MODELS = [
   { key: "voyage-4-nano", label: "Voyage 4 Nano (open-weight)", dimensions: 1024, context_length: 32000, pricing_per_million_tokens: 0, description: "Open-weight model available on Hugging Face" },
 ];
 
+/** Cohere embedding models — sourced from https://docs.cohere.com/docs/models#embedding */
+const COHERE_MODELS = [
+  { key: "embed-english-v3.0", label: "Embed English v3.0", dimensions: 1024, description: "State-of-the-art English embedding model" },
+  { key: "embed-multilingual-v3.0", label: "Embed Multilingual v3.0", dimensions: 1024, description: "Best-in-class multilingual embedding model" },
+  { key: "embed-english-light-v3.0", label: "Embed English Light v3.0", dimensions: 384, description: "Fast and lightweight English embedding model" },
+  { key: "embed-multilingual-light-v3.0", label: "Embed Multilingual Light v3.0", dimensions: 384, description: "Fast and lightweight multilingual embedding model" },
+  { key: "embed-english-v2.0", label: "Embed English v2.0", dimensions: 4096, description: "Legacy English embedding model" },
+  { key: "embed-multilingual-v2.0", label: "Embed Multilingual v2.0", dimensions: 768, description: "Legacy multilingual embedding model" },
+];
+
 /** Pinecone cloud regions — sourced from https://docs.pinecone.io/guides/index-data/create-an-index#cloud-regions */
 const PINECONE_ENVIRONMENTS = [
   { key: "aws-us-east-1", label: "AWS - US East (Virginia) - Starter, Standard, Enterprise", cloud: "aws", region: "us-east-1" },
@@ -189,6 +199,7 @@ async function main() {
     openrouterEmbeddingModels: embeddingModels,
     openrouterParsingModels: parsingModels,
     voyageModels: VOYAGE_MODELS,
+    cohereModels: COHERE_MODELS,
     pineconeEnvironments: PINECONE_ENVIRONMENTS,
     pdfEngines: PDF_ENGINES,
   };
@@ -200,6 +211,7 @@ async function main() {
   console.log(`   ${embeddingModels.length} OpenRouter embedding models`);
   console.log(`   ${Object.keys(parsingModels).length} OpenRouter parsing models (fallback)`);
   console.log(`   ${VOYAGE_MODELS.length} Voyage AI models`);
+  console.log(`   ${COHERE_MODELS.length} Cohere models`);
   console.log(`   ${PINECONE_ENVIRONMENTS.length} Pinecone environments`);
   console.log(`   ${PDF_ENGINES.length} PDF engines`);
 

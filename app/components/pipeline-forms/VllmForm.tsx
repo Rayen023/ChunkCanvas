@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAppStore } from "@/app/lib/store";
 import { DEFAULT_VLLM_ENDPOINT, DEFAULT_PROMPTS } from "@/app/lib/constants";
 import { PIPELINE_MODALITY } from "@/app/lib/types";
@@ -73,6 +73,17 @@ export default function VllmForm({ ext }: { ext: string }) {
     : modality === "video"
     ? `vllm serve ${model || "llava-hf/LLaVA-NeXT-Video-7B-hf"} --port ${endpoint ? new URL(endpoint).port : "8000"}`
     : `vllm serve ${model || "Qwen3-VL-8B-Instruct-FP8"} --port ${endpoint ? new URL(endpoint).port : "8000"}`;
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize prompt height
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const newHeight = Math.min(Math.max(el.scrollHeight + 2, 100), 300);
+    el.style.height = `${newHeight}px`;
+  }, [prompt]);
 
   return (
     <div className="space-y-4">
@@ -149,12 +160,14 @@ export default function VllmForm({ ext }: { ext: string }) {
           Prompt
         </label>
         <textarea
+          ref={textareaRef}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          rows={6}
-          className="w-full rounded-lg border border-silver bg-card px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none resize-y"
+          style={{ minHeight: "100px", maxHeight: "300px" }}
+          className="w-full rounded-lg border border-silver bg-card px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none resize-y overflow-y-auto"
         />
       </div>
     </div>
   );
 }
+

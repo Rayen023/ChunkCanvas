@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useEffect } from "react";
 import { PIPELINE, PIPELINE_ALLOWED_EXTENSIONS } from "@/app/lib/constants";
 import { useAppStore } from "@/app/lib/store";
@@ -173,8 +174,22 @@ export default function PipelineSelector() {
                         </span>
 
                         <span
-                          className={`text-sm font-medium ${isSelected ? "text-gunmetal" : "text-gunmetal-light"}`}
+                          className={`text-sm font-medium ${isSelected ? "text-gunmetal" : "text-gunmetal-light"} flex items-center gap-2`}
                         >
+                          {name.startsWith("OpenRouter") && (
+                            <Image src="/tech-icons/openrouter.svg" alt="OpenRouter" width={16} height={16} className="h-4 w-4" />
+                          )}
+                          {name.startsWith("Ollama") && (
+                            <Image src="/tech-icons/ollama.svg" alt="Ollama" width={16} height={16} className="h-4 w-4" />
+                          )}
+                          {name.startsWith("vLLM") && (
+                            <Image src="/tech-icons/vllm-color.svg" alt="vLLM" width={16} height={16} className="h-4 w-4" />
+                          )}
+                          {(name === PIPELINE.SIMPLE_TEXT || name === PIPELINE.EXCEL_SPREADSHEET || name === PIPELINE.CSV_SPREADSHEET) && (
+                            <svg className="h-4 w-4 text-silver-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          )}
                           {name}
                         </span>
 

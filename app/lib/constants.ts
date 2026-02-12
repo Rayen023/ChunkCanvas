@@ -2,6 +2,7 @@ import {
   PIPELINE,
   type PdfEngineOption,
   type VoyageModel,
+  type CohereModel,
   type PineconeEnvironment,
   type OpenRouterModel,
   type OpenRouterModelFull,
@@ -142,6 +143,13 @@ export const EMBEDDING_MODELS: OpenRouterModelFull[] =
 /** Voyage AI embedding models — loaded from generated JSON. */
 export const VOYAGE_MODELS: VoyageModel[] = generatedData.voyageModels as VoyageModel[];
 
+// ─── Cohere ───────────────────────────────────────────────────────────────
+
+/** Cohere embedding models — loaded from generated JSON. */
+export const COHERE_MODELS: CohereModel[] = (
+  generatedData as unknown as { cohereModels: CohereModel[] }
+).cohereModels;
+
 // ─── Pinecone ─────────────────────────────────────────────────────────────
 
 /** Pinecone cloud environments — loaded from generated JSON. */
@@ -152,6 +160,11 @@ export const PINECONE_ENVIRONMENTS: PineconeEnvironment[] =
 
 export const DEFAULT_CHUNK_SIZE = 4096;
 export const DEFAULT_CHUNK_OVERLAP = 50;
+
+export const CHUNKING_TYPE_LABELS: Record<string, string> = {
+  "recursive": "Recursive Character Text Splitting",
+  "parent-child": "Parent-Child Chunking (Hierarchical)",
+};
 
 /**
  * Default separators — ordered from coarsest to finest.

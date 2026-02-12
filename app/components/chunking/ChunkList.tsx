@@ -35,8 +35,14 @@ export default function ChunkList() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gunmetal">Chunks</h2>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-gunmetal whitespace-nowrap">Chunks</h2>
+          <div className="flex items-center gap-1.5 text-xs text-silver-dark border-l border-silver-light/60 pl-3">
+            <span className="h-1 w-1 rounded-full bg-sandy" />
+            Changes auto-save as you edit
+          </div>
+        </div>
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -65,13 +71,7 @@ export default function ChunkList() {
         </div>
       </div>
 
-      {/* Auto-save notice */}
-      <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
-        Edits are <strong>auto-saved</strong> — just type in any chunk below and
-        your changes are kept automatically. No need to press save.
-      </div>
-
-      <div className="space-y-3">
+      <div className="space-y-2">
         {editedChunks.map((text, i) => (
           <ChunkCard
             key={`chunk-${i}`}
