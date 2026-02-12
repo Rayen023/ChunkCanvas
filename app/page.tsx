@@ -43,6 +43,7 @@ export default function Home() {
   const parsedResults = useAppStore((s) => s.parsedResults);
 
   const [parsingTimer, setParsingTimer] = useState(0);
+  const [isChunkPreviewPending, setIsChunkPreviewPending] = useState(false);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -290,12 +291,20 @@ export default function Home() {
   // ── Live Chunking ──────────────────────────────────────────
   useEffect(() => {
     if ((parsedContent || parsedResults.length > 0) && !isParsing) {
+      setIsChunkPreviewPending(true);
       const timer = setTimeout(() => {
         handleChunk();
       }, 400);
       return () => clearTimeout(timer);
     }
+    setIsChunkPreviewPending(false);
   }, [chunkingParams, parsedResults, parsedContent, isParsing, handleChunk]);
+
+  useEffect(() => {
+    if (isChunking) {
+      setIsChunkPreviewPending(false);
+    }
+  }, [isChunking]);
 
   const pipelinesByExt = useAppStore((s) => s.pipelinesByExt);
 
@@ -402,31 +411,58 @@ export default function Home() {
 
       {/* ═══════ STEP 4 — Chunking Configuration & Preview ═══════ */}
       {parsedContent !== null && (
-        <section id="step-4" className="bg-card rounded-xl shadow-sm border border-silver-light p-6 space-y-5">
-          <h2 className="text-lg font-semibold text-gunmetal">
-            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-sandy text-white text-xs font-bold mr-2">
-              4
-            </span>
-            Chunking Configuration &amp; Preview
-          </h2>
-          <ChunkingParams />
-          {isChunking && (
-            <div className="flex items-center justify-center gap-2 py-2 text-xs text-silver-dark italic">
-              <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Updating chunks...
+        <section id="step-4" className="bg-card rounded-xl shadow-sm border border-silver-light p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <h2 className="text-lg font-semibold text-gunmetal">
+              <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-sandy text-white text-xs font-bold mr-2">
+                4
+              </span>
+              Chunking Configuration &amp; Preview
+            </h2>
+
+            {(isChunking || isChunkPreviewPending) && (
+              <div className="flex items-center gap-2 rounded-lg border border-silver-light bg-card px-3 py-1.5 text-xs text-silver-dark">
+                {isChunking ? (
+                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  <span className="inline-flex items-center gap-1" aria-hidden>
+                    <span className="h-1.5 w-1.5 rounded-full bg-sandy animate-pulse" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-sandy/70 animate-pulse [animation-delay:150ms]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-sandy/50 animate-pulse [animation-delay:300ms]" />
+                  </span>
+                )}
+                {isChunking ? "Updating" : "Applying changes…"}
+              </div>
+            )}
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[360px,1fr] lg:items-start">
+            {/* Left: Params */}
+            <div className="rounded-xl border border-silver-light bg-card p-4">
+              <ChunkingParams />
             </div>
-          )}
-          {editedChunks.length > 0 && (
-            <>
-              <div className="h-px bg-silver-light" />
-              <ChunkList />
-              <div className="h-px bg-silver-light" />
-              <ChunkActions />
-            </>
-          )}
+
+            {/* Right: Live preview + actions */}
+            <div className="rounded-xl border border-silver-light bg-card p-4">
+              {editedChunks.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  <div className="max-h-[60vh] overflow-y-auto overflow-x-hidden pr-1">
+                    <ChunkList variant="panel" pending={isChunkPreviewPending} />
+                  </div>
+                  <div className="border-t border-silver-light pt-3">
+                    <ChunkActions />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center rounded-lg border border-dashed border-silver-light p-6 text-sm text-silver-dark">
+                  Chunks will appear here as you adjust the parameters.
+                </div>
+              )}
+            </div>
+          </div>
         </section>
       )}
 

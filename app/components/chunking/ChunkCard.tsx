@@ -16,8 +16,6 @@ interface Props {
 function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed, isLightMode }: Props) {
   const [localExpanded, setLocalExpanded] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
-  const [prevText, setPrevText] = useState(text);
-  const [prevForceCollapsed, setPrevForceCollapsed] = useState(forceCollapsed);
   const [showSaved, setShowSaved] = useState(false);
 
   // Hide the "Saved" indicator after 2 seconds
@@ -29,12 +27,11 @@ function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed
   }, [showSaved]);
 
   // Sync local expanded state when the global toggle changes
-  if (forceCollapsed !== prevForceCollapsed) {
-    setPrevForceCollapsed(forceCollapsed);
-    if (forceCollapsed !== undefined) {
-      setLocalExpanded(!forceCollapsed);
-    }
-  }
+  useEffect(() => {
+    if (forceCollapsed === undefined) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocalExpanded(!forceCollapsed);
+  }, [forceCollapsed]);
 
   const expanded = localExpanded;
 
@@ -43,10 +40,10 @@ function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed
   }, [text]);
 
   // Reset confirmation if text changes (e.g. reused component for next chunk after delete)
-  if (text !== prevText) {
-    setPrevText(text);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsConfirming(false);
-  }
+  }, [text]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -98,104 +95,98 @@ function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed
       {/* Header */}
       <div
         onClick={() => setLocalExpanded((v) => !v)}
-        className="flex w-full items-center justify-between px-4 py-3 cursor-pointer hover:bg-silver-light/30 transition-colors "
+        className="flex w-full items-center justify-between px-3 py-2 cursor-pointer hover:bg-silver-light/30 transition-colors"
       >
-        <div className="flex w-full items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gunmetal">
-              📑 Chunk {index + 1}
-            </span>
+        <div className="flex w-full items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-medium text-gunmetal whitespace-nowrap">Chunk {index + 1}</span>
+
             {sourceFile && (
-              <span className="text-[10px] text-sandy-dark bg-sandy/10 px-2 py-0.5 rounded-full font-mono truncate max-w-[200px]" title={sourceFile}>
+              <span
+                className="text-[10px] text-sandy-dark bg-sandy/10 px-2 py-0.5 rounded-full font-mono truncate max-w-[180px]"
+                title={sourceFile}
+              >
                 {sourceFile}
               </span>
             )}
-            
+
+            <span className="text-[11px] text-silver-dark bg-silver-light/50 px-2 py-0.5 rounded-full whitespace-nowrap">
+              {tokenCount.toLocaleString()} tokens
+            </span>
+
+            <span
+              className={
+                "inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700 transition-opacity " +
+                (showSaved ? "opacity-100" : "opacity-0")
+              }
+              aria-hidden={!showSaved}
+            >
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Saved
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
             {isConfirming ? (
-               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <span className="text-xs font-medium text-red-600">Sure?</span>
-                  <button
-                    type="button"
-                    onClick={handleConfirmDelete}
-                    className="rounded-md bg-red-600 px-2 py-1 text-xs font-bold text-white hover:bg-red-700 transition-colors cursor-pointer shadow-sm"
-                  >
-                    Yes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancelDelete}
-                    className="rounded-md bg-silver-light px-2 py-1 text-xs font-medium text-gunmetal hover:bg-silver transition-colors cursor-pointer shadow-sm"
-                  >
-                    No
-                  </button>
-               </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-medium text-red-600">Delete?</span>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  className="rounded-md bg-red-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-red-700 transition-colors cursor-pointer shadow-sm"
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelDelete}
+                  className="rounded-md bg-silver-light px-2 py-1 text-[11px] font-medium text-gunmetal hover:bg-silver transition-colors cursor-pointer shadow-sm"
+                >
+                  No
+                </button>
+              </div>
             ) : (
               <button
                 type="button"
                 onClick={handleDeleteClick}
-                className="group flex items-center rounded-lg p-1.5 text-red-600 hover:bg-red-50 hover:text-red-700 transition-all cursor-pointer"
+                className="flex items-center rounded-lg p-1.5 text-red-600 hover:bg-red-50 hover:text-red-700 transition-all cursor-pointer"
                 title="Delete chunk"
               >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                   />
                 </svg>
-                <span className="max-w-0 overflow-hidden opacity-0 whitespace-nowrap text-xs font-medium group-hover:max-w-[100px] group-hover:ml-1 group-hover:opacity-100 transition-all duration-300">
-                  Delete chunk
-                </span>
               </button>
             )}
-          </div>
 
-          <div className="flex items-center gap-3 mr-4">
-             <div
-              className={`flex items-center gap-1.5 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 transition-all duration-300 ${
-                showSaved ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1 hidden"
-              }`}
+            <button
+              type="button"
+              onClick={() => setLocalExpanded((v) => !v)}
+              className="rounded-lg p-1.5 text-silver-dark hover:bg-silver-light/40 transition-colors cursor-pointer"
+              title={expanded ? "Collapse" : "Expand"}
             >
               <svg
-                className="h-3 w-3"
+                className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
-                strokeWidth={2.5}
+                strokeWidth={2}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
-              Saved
-            </div>
-            <span className="text-xs text-silver-dark bg-silver-light/50 px-2 py-0.5 rounded-full">
-              {tokenCount.toLocaleString()} tokens
-            </span>
-            <svg
-              className={`h-4 w-4 text-silver-dark transition-transform ${expanded ? "rotate-180" : ""}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
+            </button>
           </div>
         </div>
       </div>
 
       {/* Content */}
       {expanded && (
-        <div className="px-4 pb-4">
+        <div className="px-3 pb-3">
           <textarea
             ref={textareaRef}
             value={text}
@@ -205,6 +196,14 @@ function ChunkCard({ index, text, sourceFile, onUpdate, onDelete, forceCollapsed
               isLightMode ? "!bg-[#fbfbfb]" : "dark:!bg-black/20"
             }`}
           />
+        </div>
+      )}
+
+      {!expanded && (
+        <div className="px-3 pb-2 text-xs font-mono text-silver-dark whitespace-pre-wrap">
+          <div className="max-h-12 overflow-hidden">
+            {text.length > 260 ? `${text.slice(0, 260)}…` : text}
+          </div>
         </div>
       )}
     </div>
