@@ -163,7 +163,6 @@ export const DEFAULT_CHUNK_OVERLAP = 50;
 
 export const CHUNKING_TYPE_LABELS: Record<string, string> = {
   "recursive": "Recursive Character Text Splitting",
-  "parent-child": "Parent-Child Chunking (Hierarchical)",
 };
 
 /**

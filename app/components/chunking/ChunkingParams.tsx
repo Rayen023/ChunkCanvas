@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useAppStore } from "@/app/lib/store";
 import {
@@ -50,7 +51,6 @@ export default function ChunkingParams() {
 
   /** Whether current params differ from defaults */
   const isModified = useMemo(() => {
-    if (chunkingParams.chunkingType !== "recursive") return true;
     if (chunkingParams.chunkSize !== DEFAULT_CHUNK_SIZE) return true;
     if (chunkingParams.chunkOverlap !== DEFAULT_CHUNK_OVERLAP) return true;
     if (chunkingParams.separators.length !== DEFAULT_SEPARATORS.length) return true;
@@ -132,14 +132,16 @@ export default function ChunkingParams() {
     <div className="space-y-3">
       {/* Strategy + Defaults */}
       <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-gunmetal">Chunking Strategy</div>
-          <div className="text-xs text-silver-dark">
-            Tune the split parameters and watch chunks update live.
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-silver-light/20 p-1.5">
+            <Image src="/tech-icons/langchain-color.svg" alt="LangChain" width={32} height={32} className="h-full w-full object-contain" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-gunmetal">Recursive character text splitter (Langchain)</div>
           </div>
         </div>
 
-        {chunkingParams.chunkingType === "recursive" && isModified && (
+        {isModified && (
           <button
             type="button"
             onClick={resetChunkingDefaults}
@@ -154,285 +156,239 @@ export default function ChunkingParams() {
         )}
       </div>
 
-      {/* Compact segmented strategy selector */}
-      <div className="rounded-xl border border-silver-light bg-silver-light/20 p-1">
-        <div className="grid grid-cols-2 gap-1">
-          <button
-            type="button"
-            onClick={() => setChunkingParams({ chunkingType: "recursive" })}
-            className={
-              "flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors cursor-pointer " +
-              (chunkingParams.chunkingType === "recursive"
-                ? "bg-sandy text-white"
-                : "bg-card text-gunmetal hover:bg-sandy/10 hover:text-sandy")
-            }
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12" />
-            </svg>
-            Recursive
-          </button>
+      <div className="space-y-3">
+        {/* Tuning */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Chunk size */}
+          <div className="rounded-lg border border-silver-light bg-card p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-semibold text-gunmetal">Chunk size (characters)</label>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleChunkSizeChange(chunkingParams.chunkSize - 128)}
+                  className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-semibold text-gunmetal-light hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
+                  title="-128"
+                >
+                  −
+                </button>
 
-          <button
-            type="button"
-            onClick={() => setChunkingParams({ chunkingType: "parent-child" })}
-            className={
-              "flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors cursor-pointer " +
-              (chunkingParams.chunkingType === "parent-child"
-                ? "bg-sandy text-white"
-                : "bg-card text-gunmetal hover:bg-sandy/10 hover:text-sandy")
-            }
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z" />
-            </svg>
-            Parent-Child
-          </button>
-        </div>
-      </div>
-
-      {chunkingParams.chunkingType === "recursive" ? (
-        <div className="space-y-3">
-          {/* Tuning */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Chunk size */}
-            <div className="rounded-lg border border-silver-light bg-card p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-semibold text-gunmetal">Chunk size (characters)</label>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleChunkSizeChange(chunkingParams.chunkSize - 128)}
-                    className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-semibold text-gunmetal-light hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
-                    title="-128"
-                  >
-                    −
-                  </button>
-
-                  <div className="flex items-center rounded-md border border-silver bg-card px-2 py-1">
-                    <input
-                      type="number"
-                      min={128}
-                      step={128}
-                      value={chunkingParams.chunkSize}
-                      onChange={(e) => handleChunkSizeChange(Number(e.target.value))}
-                      className="w-16 bg-transparent text-right text-xs font-mono font-semibold text-sandy tabular-nums outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <span className="ml-1 text-[10px] font-medium text-silver-dark">chars</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleChunkSizeChange(chunkingParams.chunkSize + 128)}
-                    className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-semibold text-gunmetal-light hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
-                    title="+128"
-                  >
-                    +
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleChunkSizeChange(Math.max(128, maxContentLength))}
-                    className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-semibold text-gunmetal-light hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
-                    title="Set chunk size to the maximum content length"
-                  >
-                    Max
-                  </button>
+                <div className="flex items-center rounded-md border border-silver bg-card px-2 py-1">
+                  <input
+                    type="number"
+                    min={128}
+                    step={128}
+                    value={chunkingParams.chunkSize}
+                    onChange={(e) => handleChunkSizeChange(Number(e.target.value))}
+                    className="w-16 bg-transparent text-right text-xs font-mono font-semibold text-sandy tabular-nums outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="ml-1 text-[10px] font-medium text-silver-dark">chars</span>
                 </div>
-              </div>
-              <input
-                type="range"
-                min={128}
-                max={Math.max(128, maxContentLength)}
-                step={128}
-                value={chunkingParams.chunkSize}
-                onChange={(e) => handleChunkSizeChange(Number(e.target.value))}
-                className="w-full h-1 rounded-full appearance-none cursor-pointer accent-sandy bg-silver/40 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sandy [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-sandy [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] font-medium text-silver-dark tabular-nums">
-                <span>128 chars</span>
-                <span>{Math.max(128, maxContentLength)} chars</span>
+
+                <button
+                  type="button"
+                  onClick={() => handleChunkSizeChange(chunkingParams.chunkSize + 128)}
+                  className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-semibold text-gunmetal-light hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
+                  title="+128"
+                >
+                  +
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleChunkSizeChange(Math.max(128, maxContentLength))}
+                  className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-semibold text-gunmetal-light hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
+                  title="Set chunk size to the maximum content length"
+                >
+                  Max
+                </button>
               </div>
             </div>
+            <input
+              type="range"
+              min={128}
+              max={Math.max(128, maxContentLength)}
+              step={128}
+              value={chunkingParams.chunkSize}
+              onChange={(e) => handleChunkSizeChange(Number(e.target.value))}
+              className="w-full h-1 rounded-full appearance-none cursor-pointer accent-sandy bg-silver/40 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sandy [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-sandy [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+            />
+            <div className="flex justify-between text-[10px] font-medium text-silver-dark tabular-nums">
+              <span>128 chars</span>
+              <span>{Math.max(128, maxContentLength)} chars</span>
+            </div>
+          </div>
 
-            {/* Overlap */}
-            <div className="rounded-lg border border-silver-light bg-card p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-semibold text-gunmetal">Overlap (characters)</label>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setChunkingParams({ chunkOverlap: Math.max(0, chunkingParams.chunkOverlap - 10) })}
-                    className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-semibold text-gunmetal-light hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
-                    title="-10"
-                  >
-                    −
-                  </button>
+          {/* Overlap */}
+          <div className="rounded-lg border border-silver-light bg-card p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-semibold text-gunmetal">Overlap (characters)</label>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setChunkingParams({ chunkOverlap: Math.max(0, chunkingParams.chunkOverlap - 10) })}
+                  className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-semibold text-gunmetal-light hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
+                  title="-10"
+                >
+                  −
+                </button>
 
-                  <div className="flex items-center rounded-md border border-silver bg-card px-2 py-1">
-                    <input
-                      type="number"
-                      min={0}
-                      max={chunkingParams.chunkSize - 1}
-                      step={10}
-                      value={chunkingParams.chunkOverlap}
-                      onChange={(e) =>
-                        setChunkingParams({
-                          chunkOverlap: Math.max(
-                            0,
-                            Math.min(Number(e.target.value), Math.max(0, chunkingParams.chunkSize - 1)),
-                          ),
-                        })
-                      }
-                      className="w-16 bg-transparent text-right text-xs font-mono font-semibold text-sandy tabular-nums outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <span className="ml-1 text-[10px] font-medium text-silver-dark">chars</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
+                <div className="flex items-center rounded-md border border-silver bg-card px-2 py-1">
+                  <input
+                    type="number"
+                    min={0}
+                    max={chunkingParams.chunkSize - 1}
+                    step={10}
+                    value={chunkingParams.chunkOverlap}
+                    onChange={(e) =>
                       setChunkingParams({
-                        chunkOverlap: Math.min(chunkingParams.chunkOverlap + 10, Math.max(0, chunkingParams.chunkSize - 1)),
+                        chunkOverlap: Math.max(
+                          0,
+                          Math.min(Number(e.target.value), Math.max(0, chunkingParams.chunkSize - 1)),
+                        ),
                       })
                     }
-                    className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-semibold text-gunmetal-light hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
-                    title="+10"
-                  >
-                    +
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setChunkingParams({ chunkOverlap: Math.max(0, chunkingParams.chunkSize - 1) })}
-                    className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-semibold text-gunmetal-light hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
-                    title="Set overlap to the maximum allowed"
-                  >
-                    Max
-                  </button>
+                    className="w-16 bg-transparent text-right text-xs font-mono font-semibold text-sandy tabular-nums outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="ml-1 text-[10px] font-medium text-silver-dark">chars</span>
                 </div>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={Math.max(0, chunkingParams.chunkSize - 1)}
-                step={10}
-                value={chunkingParams.chunkOverlap}
-                onChange={(e) => setChunkingParams({ chunkOverlap: Number(e.target.value) })}
-                className="w-full h-1 rounded-full appearance-none cursor-pointer accent-sandy bg-silver/40 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sandy [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-sandy [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
-              />
-              <div className="flex items-center justify-between text-[10px] font-medium text-silver-dark tabular-nums">
-                <span>0 chars</span>
-                <span>
-                  {chunkingParams.chunkOverlap} chars ({Math.round((chunkingParams.chunkOverlap / Math.max(1, chunkingParams.chunkSize)) * 100)}%)
-                </span>
-              </div>
-            </div>
-          </div>
 
-          {/* Separators */}
-          <div className="rounded-lg border border-silver-light bg-card p-3 space-y-2">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-semibold text-gunmetal">Separators</div>
-                <div className="text-[11px] text-silver-dark">
-                  Click to toggle. Drag active ones to reorder (left → right priority).
-                </div>
-              </div>
-
-              {!showCustom && (
                 <button
                   type="button"
-                  onClick={() => setShowCustom(true)}
-                  className="inline-flex items-center rounded-md border border-dashed border-silver px-2.5 py-1 text-[11px] text-silver-dark hover:border-sandy hover:text-sandy transition-colors cursor-pointer shrink-0"
-                >
-                  + Custom
-                </button>
-              )}
-            </div>
-            {showCustom && (
-              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="text"
-                  value={customSep}
-                  onChange={(e) => setCustomSep(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addCustom()}
-                  placeholder="e.g. \\n\\n or |"
-                  className="flex-1 min-w-0 rounded-md border border-silver px-2 py-1 text-[11px] focus:ring-1 focus:ring-sandy/50 focus:border-sandy outline-none"
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={addCustom}
-                  className="rounded-md bg-sandy px-2.5 py-1 text-[11px] font-medium text-white hover:bg-sandy-light transition-colors cursor-pointer"
-                >
-                  Add
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCustom(false);
-                    setCustomSep("");
-                  }}
-                  className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-medium text-silver-dark hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
-                  title="Cancel"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-1.5">
-              {/* Active / Draggable Separators */}
-              {chunkingParams.separators.map((sep, idx) => (
-                <button
-                  key={`active-${sep}-${idx}`}
-                  type="button"
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, sep)}
-                  onDragOver={(e) => handleDragOver(e, idx)}
-                  onDrop={() => setDraggedSep(null)}
-                  onDragEnd={handleDragEnd}
-                  onClick={() => toggleSep(sep)}
-                  className={
-                    "inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-medium transition-all border-sandy bg-sandy/10 text-sandy-dark hover:bg-sandy/20 cursor-grab active:cursor-grabbing " +
-                    (draggedSep === sep ? "opacity-40" : "")
+                  onClick={() =>
+                    setChunkingParams({
+                      chunkOverlap: Math.min(chunkingParams.chunkOverlap + 10, Math.max(0, chunkingParams.chunkSize - 1)),
+                    })
                   }
-                  title={`Drag to reorder; click to remove "${label(sep)}"`}
+                  className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-semibold text-gunmetal-light hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
+                  title="+10"
                 >
-                  {label(sep)}
+                  +
                 </button>
-              ))}
 
-              {/* Inactive Separators */}
-              {ALL_SEPARATORS.filter((s) => !activeSeps.has(s)).map((sep) => (
                 <button
-                  key={`inactive-${sep}`}
                   type="button"
-                  onClick={() => toggleSep(sep)}
-                  className="inline-flex items-center rounded-md border border-silver-light bg-card px-2.5 py-1 text-[11px] font-medium text-silver-dark opacity-60 hover:opacity-100 transition-all cursor-pointer hover:border-sandy"
-                  title={`Click to add "${label(sep)}"`}
+                  onClick={() => setChunkingParams({ chunkOverlap: Math.max(0, chunkingParams.chunkSize - 1) })}
+                  className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-semibold text-gunmetal-light hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
+                  title="Set overlap to the maximum allowed"
                 >
-                  {label(sep)}
+                  Max
                 </button>
-              ))}
-            </div>
-
-            {editedChunks.length > 0 && (
-              <div className="text-[11px] text-silver-dark">
-                Note: changing these parameters regenerates chunks and may overwrite any manual edits in the preview.
               </div>
-            )}
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(0, chunkingParams.chunkSize - 1)}
+              step={10}
+              value={chunkingParams.chunkOverlap}
+              onChange={(e) => setChunkingParams({ chunkOverlap: Number(e.target.value) })}
+              className="w-full h-1 rounded-full appearance-none cursor-pointer accent-sandy bg-silver/40 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-sandy [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-sandy [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+            />
+            <div className="flex items-center justify-between text-[10px] font-medium text-silver-dark tabular-nums">
+              <span>0 chars</span>
+              <span>
+                {chunkingParams.chunkOverlap} chars ({Math.round((chunkingParams.chunkOverlap / Math.max(1, chunkingParams.chunkSize)) * 100)}%)
+              </span>
+            </div>
           </div>
         </div>
-      ) : (
-        <div className="rounded-lg border border-silver-light bg-card p-4 text-center">
-          <p className="text-xs text-silver-dark italic">
-            Hierarchical parent-child chunking parameters will be configurable here in a future update.
-          </p>
+
+        {/* Separators */}
+        <div className="rounded-lg border border-silver-light bg-card p-3 space-y-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-gunmetal">Separators</div>
+              <div className="text-[11px] text-silver-dark">
+                Click to toggle. Drag active ones to reorder (left → right priority).
+              </div>
+            </div>
+
+            {!showCustom && (
+              <button
+                type="button"
+                onClick={() => setShowCustom(true)}
+                className="inline-flex items-center rounded-md border border-dashed border-silver px-2.5 py-1 text-[11px] text-silver-dark hover:border-sandy hover:text-sandy transition-colors cursor-pointer shrink-0"
+              >
+                + Custom
+              </button>
+            )}
+          </div>
+          {showCustom && (
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <input
+                type="text"
+                value={customSep}
+                onChange={(e) => setCustomSep(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addCustom()}
+                placeholder="e.g. \\n\\n or |"
+                className="flex-1 min-w-0 rounded-md border border-silver px-2 py-1 text-[11px] focus:ring-1 focus:ring-sandy/50 focus:border-sandy outline-none"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={addCustom}
+                className="rounded-md bg-sandy px-2.5 py-1 text-[11px] font-medium text-white hover:bg-sandy-light transition-colors cursor-pointer"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCustom(false);
+                  setCustomSep("");
+                }}
+                className="rounded-md border border-silver-light px-2 py-1 text-[11px] font-medium text-silver-dark hover:border-sandy hover:text-sandy transition-colors cursor-pointer"
+                title="Cancel"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-1.5">
+            {/* Active / Draggable Separators */}
+            {chunkingParams.separators.map((sep, idx) => (
+              <button
+                key={`active-${sep}-${idx}`}
+                type="button"
+                draggable
+                onDragStart={(e) => handleDragStart(e, sep)}
+                onDragOver={(e) => handleDragOver(e, idx)}
+                onDrop={() => setDraggedSep(null)}
+                onDragEnd={handleDragEnd}
+                onClick={() => toggleSep(sep)}
+                className={
+                  "inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-medium transition-all border-sandy bg-sandy/10 text-sandy-dark hover:bg-sandy/20 cursor-grab active:cursor-grabbing " +
+                  (draggedSep === sep ? "opacity-40" : "")
+                }
+                title={`Drag to reorder; click to remove "${label(sep)}"`}
+              >
+                {label(sep)}
+              </button>
+            ))}
+
+            {/* Inactive Separators */}
+            {ALL_SEPARATORS.filter((s) => !activeSeps.has(s)).map((sep) => (
+              <button
+                key={`inactive-${sep}`}
+                type="button"
+                onClick={() => toggleSep(sep)}
+                className="inline-flex items-center rounded-md border border-silver-light bg-card px-2.5 py-1 text-[11px] font-medium text-silver-dark opacity-60 hover:opacity-100 transition-all cursor-pointer hover:border-sandy"
+                title={`Click to add "${label(sep)}"`}
+              >
+                {label(sep)}
+              </button>
+            ))}
+          </div>
+
+          {editedChunks.length > 0 && (
+            <div className="text-[11px] text-silver-dark">
+              Note: changing these parameters regenerates chunks and may overwrite any manual edits in the preview.
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

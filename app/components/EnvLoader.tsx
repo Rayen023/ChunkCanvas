@@ -13,12 +13,18 @@ export default function EnvLoader() {
   const setVoyageApiKey = useAppStore((s) => s.setVoyageApiKey);
   const setCohereApiKey = useAppStore((s) => s.setCohereApiKey);
   const setPineconeApiKey = useAppStore((s) => s.setPineconeApiKey);
+  const setChromaApiKey = useAppStore((s) => s.setChromaApiKey);
+  const setChromaTenant = useAppStore((s) => s.setChromaTenant);
+  const setChromaDatabase = useAppStore((s) => s.setChromaDatabase);
 
   useEffect(() => {
     const or = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY ?? "";
     const va = process.env.NEXT_PUBLIC_VOYAGEAI_API_KEY ?? "";
     const co = process.env.NEXT_PUBLIC_COHERE_API_KEY ?? "";
     const pc = process.env.NEXT_PUBLIC_PINECONE_API_KEY ?? "";
+    const ck = process.env.NEXT_PUBLIC_CHROMA_API_KEY ?? "";
+    const ct = process.env.NEXT_PUBLIC_CHROMA_TENANT ?? "";
+    const cd = process.env.NEXT_PUBLIC_CHROMA_DATABASE ?? "";
 
     setEnvKeys({ openrouter: or, voyage: va, cohere: co, pinecone: pc });
 
@@ -27,7 +33,19 @@ export default function EnvLoader() {
     if (va) setVoyageApiKey(va);
     if (co) setCohereApiKey(co);
     if (pc) setPineconeApiKey(pc);
-  }, [setEnvKeys, setOpenrouterApiKey, setVoyageApiKey, setCohereApiKey, setPineconeApiKey]);
+    if (ck) setChromaApiKey(ck);
+    if (ct) setChromaTenant(ct);
+    if (cd) setChromaDatabase(cd);
+  }, [
+    setEnvKeys,
+    setOpenrouterApiKey,
+    setVoyageApiKey,
+    setCohereApiKey,
+    setPineconeApiKey,
+    setChromaApiKey,
+    setChromaTenant,
+    setChromaDatabase,
+  ]);
 
   return null;
 }

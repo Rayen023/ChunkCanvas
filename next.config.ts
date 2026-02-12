@@ -1,11 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Turbopack config (Next.js 16 default bundler)
-  turbopack: {},
-
   // External packages that should not be bundled server-side
-  serverExternalPackages: ["pdfjs-dist", "pdf-lib"],
+  serverExternalPackages: ["pdfjs-dist", "pdf-lib", "chromadb"],
 
   webpack: (config, { isServer }) => {
     // pdf-parse uses "fs" which is not available in browser

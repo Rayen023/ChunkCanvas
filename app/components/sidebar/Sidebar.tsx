@@ -5,6 +5,7 @@ import { useAppStore } from "@/app/lib/store";
 import AppInfo from "./AppInfo";
 import VllmStatus from "./VllmStatus";
 import OllamaStatus from "./OllamaStatus";
+import ChromaStatus from "./ChromaStatus";
 import ThemeToggle from "./ThemeToggle";
 
 const MIN_WIDTH = 220;
@@ -152,6 +153,10 @@ export default function Sidebar() {
           <div className="h-px bg-silver-light" />
 
           <OllamaStatus />
+
+          <div className="h-px bg-silver-light" />
+
+          <ChromaStatus />
         </div>
 
         {/* ── Footer ──────────────────────────────────── */}

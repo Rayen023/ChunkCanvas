@@ -43,6 +43,17 @@ export default function PineconeSection() {
   const pineconeFieldMapping = useAppStore((s) => s.pineconeFieldMapping);
   const setPineconeFieldMapping = useAppStore((s) => s.setPineconeFieldMapping);
 
+  const chromaMode = useAppStore((s) => s.chromaMode);
+  const chromaLocalUrl = useAppStore((s) => s.chromaLocalUrl);
+  const chromaApiKey = useAppStore((s) => s.chromaApiKey);
+  const chromaTenant = useAppStore((s) => s.chromaTenant);
+  const chromaDatabase = useAppStore((s) => s.chromaDatabase);
+  const chromaCollectionName = useAppStore((s) => s.chromaCollectionName);
+  const chromaCollections = useAppStore((s) => s.chromaCollections);
+  const isUploadingChroma = useAppStore((s) => s.isUploadingChroma);
+  const chromaError = useAppStore((s) => s.chromaError);
+  const chromaSuccess = useAppStore((s) => s.chromaSuccess);
+
   const setPineconeApiKey = useAppStore((s) => s.setPineconeApiKey);
   const setPineconeEnvKey = useAppStore((s) => s.setPineconeEnvKey);
   const setPineconeIndexName = useAppStore((s) => s.setPineconeIndexName);
@@ -52,6 +63,17 @@ export default function PineconeSection() {
   const setIsUploading = useAppStore((s) => s.setIsUploadingPinecone);
   const setPineconeError = useAppStore((s) => s.setPineconeError);
   const setPineconeSuccess = useAppStore((s) => s.setPineconeSuccess);
+
+  const setChromaMode = useAppStore((s) => s.setChromaMode);
+  const setChromaLocalUrl = useAppStore((s) => s.setChromaLocalUrl);
+  const setChromaApiKey = useAppStore((s) => s.setChromaApiKey);
+  const setChromaTenant = useAppStore((s) => s.setChromaTenant);
+  const setChromaDatabase = useAppStore((s) => s.setChromaDatabase);
+  const setChromaCollectionName = useAppStore((s) => s.setChromaCollectionName);
+  const setChromaCollections = useAppStore((s) => s.setChromaCollections);
+  const setIsUploadingChroma = useAppStore((s) => s.setIsUploadingChroma);
+  const setChromaError = useAppStore((s) => s.setChromaError);
+  const setChromaSuccess = useAppStore((s) => s.setChromaSuccess);
 
   // Create index form state
   const [showCreate, setShowCreate] = useState(false);
@@ -63,9 +85,12 @@ export default function PineconeSection() {
   
   // Namespace creation state
   const [isCreatingNamespace, setIsCreatingNamespace] = useState(false);
+  const [showCreateChromaCollection, setShowCreateChromaCollection] = useState(false);
+  const [creatingChromaCollection, setCreatingChromaCollection] = useState(false);
+  const [newChromaCollection, setNewChromaCollection] = useState("");
 
   // DB selection state
-  const [selectedDb, setSelectedDb] = useState<"pinecone" | "chroma" | "mongodb">("pinecone");
+  const [selectedDb, setSelectedDb] = useState<"pinecone" | "chroma" | "mongodb" | "faiss">("pinecone");
 
   // Auto-fill env key
   useEffect(() => {
@@ -100,6 +125,50 @@ export default function PineconeSection() {
   useEffect(() => {
     fetchIndexes();
   }, [fetchIndexes]);
+
+  const fetchChromaCollections = useCallback(async () => {
+    try {
+      setChromaError(null);
+      const query = new URLSearchParams({ mode: chromaMode });
+      if (chromaMode === "local" && chromaLocalUrl.trim()) {
+        query.set("localUrl", chromaLocalUrl.trim());
+      }
+      const response = await fetch(`/api/chroma/collections?${query.toString()}`, {
+        headers: chromaMode === "cloud" ? {
+          "x-chroma-api-key": chromaApiKey,
+          "x-chroma-tenant": chromaTenant,
+          "x-chroma-database": chromaDatabase,
+        } : undefined,
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(json.message || "Failed to list collections");
+      }
+      const collections: string[] = json.collections || [];
+      setChromaCollections(collections);
+      if (collections.length > 0 && !chromaCollectionName) {
+        setChromaCollectionName(collections[0]);
+      }
+    } catch (err) {
+      setChromaCollections([]);
+      setChromaError(err instanceof Error ? err.message : String(err));
+    }
+  }, [
+    chromaMode,
+    chromaLocalUrl,
+    chromaApiKey,
+    chromaTenant,
+    chromaDatabase,
+    chromaCollectionName,
+    setChromaCollectionName,
+    setChromaCollections,
+    setChromaError,
+  ]);
+
+  useEffect(() => {
+    if (selectedDb !== "chroma") return;
+    fetchChromaCollections();
+  }, [selectedDb, chromaMode, chromaLocalUrl, chromaApiKey, chromaTenant, chromaDatabase, fetchChromaCollections]);
 
   // Fetch namespaces when index is set
   useEffect(() => {
@@ -200,6 +269,115 @@ export default function PineconeSection() {
 
   const [generatingScript, setGeneratingScript] = useState(false);
 
+  const handleCreateChromaCollection = useCallback(async () => {
+    if (!newChromaCollection.trim()) return;
+    setCreatingChromaCollection(true);
+    setChromaError(null);
+    setChromaSuccess(null);
+    try {
+      const response = await fetch("/api/chroma/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: chromaMode,
+          localUrl: chromaMode === "local" ? chromaLocalUrl : undefined,
+          cloudApiKey: chromaMode === "cloud" ? chromaApiKey : undefined,
+          cloudTenant: chromaMode === "cloud" ? chromaTenant : undefined,
+          cloudDatabase: chromaMode === "cloud" ? chromaDatabase : undefined,
+          name: newChromaCollection.trim(),
+          getOrCreate: true,
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(json.message || "Failed to create collection");
+      }
+
+      setChromaCollectionName(newChromaCollection.trim());
+      setNewChromaCollection("");
+      setChromaSuccess(`Collection "${json.collection.name}" is ready.`);
+      await fetchChromaCollections();
+    } catch (err) {
+      setChromaError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCreatingChromaCollection(false);
+    }
+  }, [
+    newChromaCollection,
+    chromaMode,
+    chromaLocalUrl,
+    chromaApiKey,
+    chromaTenant,
+    chromaDatabase,
+    setChromaCollectionName,
+    setChromaError,
+    setChromaSuccess,
+    fetchChromaCollections,
+  ]);
+
+  const handleUploadToChroma = useCallback(async () => {
+    if (!chromaCollectionName || editedChunks.length === 0) return;
+    if (!hasEmbeddings || !embeddingsData) return;
+    setIsUploadingChroma(true);
+    setChromaError(null);
+    setChromaSuccess(null);
+    try {
+      const ids = editedChunks.map((_, index) => {
+        const sourceFile = chunkSourceFiles[index] || parsedFilename || "chunk";
+        return `${sourceFile}_chunk_${index}`;
+      });
+      const metadatas = editedChunks.map((_, index) => ({
+        filename: chunkSourceFiles[index] || parsedFilename || "",
+        chunk_index: index,
+      }));
+
+      const response = await fetch("/api/chroma/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: chromaMode,
+          localUrl: chromaMode === "local" ? chromaLocalUrl : undefined,
+          cloudApiKey: chromaMode === "cloud" ? chromaApiKey : undefined,
+          cloudTenant: chromaMode === "cloud" ? chromaTenant : undefined,
+          cloudDatabase: chromaMode === "cloud" ? chromaDatabase : undefined,
+          collectionName: chromaCollectionName,
+          createIfMissing: true,
+          ids,
+          documents: editedChunks,
+          metadatas,
+          embeddings: embeddingsData,
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(json.message || "Failed to upload chunks to Chroma");
+      }
+
+      setChromaSuccess(
+        `Chunks successfully uploaded to Chroma collection "${chromaCollectionName}" (${chromaMode}).`,
+      );
+    } catch (err) {
+      setChromaError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsUploadingChroma(false);
+    }
+  }, [
+    chromaCollectionName,
+    editedChunks,
+    chunkSourceFiles,
+    parsedFilename,
+    chromaMode,
+    chromaLocalUrl,
+    chromaApiKey,
+    chromaTenant,
+    chromaDatabase,
+    hasEmbeddings,
+    embeddingsData,
+    setIsUploadingChroma,
+    setChromaError,
+    setChromaSuccess,
+  ]);
+
   const handleGenerateScript = useCallback(async () => {
     setGeneratingScript(true);
     try {
@@ -253,11 +431,12 @@ export default function PineconeSection() {
       </h2>
 
       {/* DB Selector */}
-      <div className="flex flex-wrap gap-3 mb-6">
+      <div className="flex flex-wrap gap-2 mb-6">
         {([
           { id: "pinecone", label: "Pinecone", icon: "/tech-icons/Pinecone-Icon--Streamline-Svg-Logos.svg" },
           { id: "chroma", label: "Chroma", icon: "/tech-icons/Chroma--Streamline-Svg-Logos.svg" },
           { id: "mongodb", label: "MongoDB", icon: "/tech-icons/MongoDB.svg" },
+          { id: "faiss", label: "FAISS", icon: "/tech-icons/meta-color.svg" },
         ] as const).map((db) => {
           const isSelected = selectedDb === db.id;
           return (
@@ -265,30 +444,20 @@ export default function PineconeSection() {
               key={db.id}
               type="button"
               onClick={() => setSelectedDb(db.id)}
-              className={`
-                flex items-center gap-3 rounded-xl border px-4 py-3 transition-all duration-200 cursor-pointer group
-                ${isSelected
-                  ? "border-sandy bg-sandy/8 ring-2 ring-sandy/20 shadow-sm"
-                  : "border-silver-light bg-card hover:border-sandy/50 hover:bg-sandy/4"
-                }
-              `}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
+                isSelected
+                  ? "bg-sandy text-white border-sandy shadow-sm"
+                  : "bg-card text-gunmetal border-silver hover:border-sandy hover:bg-sandy/4"
+              }`}
             >
-              <div className={`p-1.5 rounded-lg transition-colors ${isSelected ? "bg-white shadow-sm" : "bg-gray-50 group-hover:bg-white"}`}>
-                <Image src={db.icon} alt={db.label} width={20} height={20} className="h-5 w-5 object-contain" />
-              </div>
-              <div className="text-left">
-                <div className={`text-sm font-semibold ${isSelected ? "text-gunmetal" : "text-gunmetal-light"}`}>
-                  {db.label}
-                </div>
-                {db.id !== "pinecone" && (
-                  <div className="text-[10px] text-sandy font-medium uppercase tracking-wider">Coming Soon</div>
-                )}
-                {db.id === "pinecone" && (isSelected ? (
-                  <div className="text-[10px] text-emerald-600 font-medium uppercase tracking-wider">Active</div>
-                ) : (
-                  <div className="text-[10px] text-silver-dark font-medium uppercase tracking-wider">Available</div>
-                ))}
-              </div>
+              <Image 
+                src={db.icon} 
+                alt="" 
+                width={16} 
+                height={16} 
+                className={`h-4 w-4 object-contain ${isSelected ? "brightness-0 invert" : ""}`} 
+              />
+              {db.label}
             </button>
           );
         })}
@@ -711,20 +880,200 @@ export default function PineconeSection() {
       )}
 
       {selectedDb === "chroma" && (
-        <div className="py-12 flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
-          <div className="h-16 w-16 bg-sandy/10 rounded-2xl flex items-center justify-center">
-            <Image src="/tech-icons/Chroma--Streamline-Svg-Logos.svg" alt="Chroma" width={40} height={40} className="h-10 w-10 opacity-50 grayscale" />
+        <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
+          <div className="flex items-center gap-2">
+            <Image src="/tech-icons/Chroma--Streamline-Svg-Logos.svg" alt="Chroma" width={20} height={20} className="h-5 w-5 object-contain" />
+            <h3 className="text-sm font-semibold text-gunmetal">Chroma Configuration</h3>
           </div>
-          <div className="space-y-2 max-w-sm">
-            <h3 className="text-gunmetal font-semibold text-lg">Chroma integration coming soon</h3>
-            <p className="text-silver-dark text-sm">
-              We&apos;re working on bringing native Chroma support to ChunkCanvas. Soon you&apos;ll be able to upload chunks directly to your local or hosted Chroma instances.
-            </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {([
+              { key: "local", label: "Local Chroma" },
+              { key: "cloud", label: "Chroma Cloud" },
+            ] as const).map((mode) => {
+              const selected = chromaMode === mode.key;
+              return (
+                <button
+                  key={mode.key}
+                  type="button"
+                  onClick={() => setChromaMode(mode.key)}
+                  className={`rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer ${selected
+                    ? "border-sandy bg-sandy/10 text-gunmetal"
+                    : "border-silver-light bg-card text-gunmetal-light hover:border-sandy/50"
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              );
+            })}
           </div>
-          <div className="pt-4">
-             <span className="px-3 py-1 bg-sandy/10 text-sandy text-[11px] font-bold rounded-full uppercase tracking-wider">Under Development</span>
+
+          {chromaMode === "local" && (
+            <div>
+              <label className="block text-sm font-medium text-gunmetal mb-1">
+                Local Chroma URL
+              </label>
+              <input
+                type="text"
+                value={chromaLocalUrl}
+                onChange={(e) => setChromaLocalUrl(e.target.value)}
+                placeholder="http://localhost:8000"
+                className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+              />
+            </div>
+          )}
+
+          {chromaMode === "cloud" && (
+            <div className="space-y-3">
+              <p className="text-xs text-silver-dark">
+                Chroma Cloud credentials are not persisted. They can be loaded from `NEXT_PUBLIC_CHROMA_*` env vars or entered below.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-medium text-gunmetal mb-1">Chroma API Key</label>
+                  <input
+                    type="password"
+                    value={chromaApiKey}
+                    onChange={(e) => setChromaApiKey(e.target.value)}
+                    placeholder="ck_..."
+                    className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gunmetal mb-1">Tenant</label>
+                  <input
+                    type="text"
+                    value={chromaTenant}
+                    onChange={(e) => setChromaTenant(e.target.value)}
+                    placeholder="tenant-id"
+                    className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gunmetal mb-1">Database</label>
+                  <input
+                    type="text"
+                    value={chromaDatabase}
+                    onChange={(e) => setChromaDatabase(e.target.value)}
+                    placeholder="chunkcanvas"
+                    className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Collection Selection */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gunmetal">
+              Select Collection
+            </label>
+            {chromaCollections.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-silver p-4 text-center">
+                <p className="text-xs text-silver-dark">
+                  No collections found — create one below.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {chromaCollections.map((name) => {
+                  const isSelected = chromaCollectionName === name;
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setChromaCollectionName(name)}
+                      className={`
+                        w-auto text-left rounded-lg border px-3 py-1.5 transition-all duration-150 cursor-pointer flex items-center gap-2
+                        ${isSelected
+                          ? "border-sandy bg-sandy/8 ring-2 ring-sandy/30"
+                          : "border-silver-light bg-card hover:border-sandy/50 hover:bg-sandy/4"
+                        }
+                      `}
+                    >
+                      <span
+                        className={`
+                          flex-shrink-0 h-3 w-3 rounded-full border-2 flex items-center justify-center transition-colors
+                          ${isSelected ? "border-sandy" : "border-silver"}
+                        `}
+                      >
+                        {isSelected && <span className="h-1 w-1 rounded-full bg-sandy" />}
+                      </span>
+                      <span className={`text-[11px] font-medium font-mono ${isSelected ? "text-gunmetal" : "text-gunmetal-light"}`}>
+                        {name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
+
+          <details
+            open={showCreateChromaCollection}
+            onToggle={(e) => setShowCreateChromaCollection((e.target as HTMLDetailsElement).open)}
+            className="group rounded-lg border border-silver-light overflow-hidden"
+          >
+            <summary className="cursor-pointer list-none flex items-center gap-2 bg-card px-4 py-3 hover:bg-sandy/4 transition-colors">
+              <svg className="h-4 w-4 text-sandy flex-shrink-0 group-open:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-sm font-medium text-gunmetal">Create New Collection</span>
+              <svg className="h-4 w-4 text-sandy ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </summary>
+            <div className="border-t border-silver-light bg-gray-50 dark:bg-white/5 px-4 py-4 space-y-3">
+              <input
+                type="text"
+                value={newChromaCollection}
+                onChange={(e) => setNewChromaCollection(e.target.value)}
+                placeholder="my_collection"
+                className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+              />
+              <p className="text-[11px] text-silver-dark">
+                Name must be 3-512 chars, lowercase alphanumeric with dots, dashes, or underscores.
+              </p>
+              <button
+                type="button"
+                onClick={handleCreateChromaCollection}
+                disabled={!newChromaCollection.trim() || creatingChromaCollection}
+                className="w-full rounded-lg bg-sandy px-3 py-2.5 text-sm font-medium text-white hover:bg-sandy-light active:bg-sandy-dark disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              >
+                {creatingChromaCollection ? "Creating…" : "Create Collection"}
+              </button>
+            </div>
+          </details>
+
+          {!hasEmbeddings && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+              <strong>Note:</strong> You must generate embeddings in the Embeddings step above before uploading.
+            </div>
+          )}
+
+          <button
+            onClick={handleUploadToChroma}
+            disabled={!chromaCollectionName || !hasEmbeddings || isUploadingChroma || editedChunks.length === 0}
+            className="w-full flex items-center justify-center gap-2 rounded-lg bg-sandy px-4 py-3 text-sm font-medium text-white hover:bg-sandy-light active:bg-sandy-dark disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+          >
+            {isUploadingChroma ? "Uploading…" : "Upload Chunks to Chroma"}
+          </button>
+
+          {chromaError && (
+            <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700">
+              {chromaError}
+            </div>
+          )}
+          {chromaSuccess && (
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
+              {chromaSuccess}
+            </div>
+          )}
+
+          <p className="text-[11px] text-silver-dark">
+            Upload uses upsert and will reuse existing chunk IDs when they already exist.
+          </p>
+          </div>
       )}
 
       {selectedDb === "mongodb" && (
@@ -733,13 +1082,24 @@ export default function PineconeSection() {
             <Image src="/tech-icons/MongoDB.svg" alt="MongoDB" width={40} height={40} className="h-10 w-10 opacity-50 grayscale" />
           </div>
           <div className="space-y-2 max-w-sm">
-            <h3 className="text-gunmetal font-semibold text-lg">MongoDB Atlas Vector Search coming soon</h3>
+            <h3 className="text-gunmetal font-semibold text-lg">MongoDB Atlas Vector Search</h3>
             <p className="text-silver-dark text-sm">
               Native support for MongoDB Atlas Vector Search is on our roadmap. Stay tuned for updates!
             </p>
           </div>
-          <div className="pt-4">
-             <span className="px-3 py-1 bg-sandy/10 text-sandy text-[11px] font-bold rounded-full uppercase tracking-wider">Planned Feature</span>
+        </div>
+      )}
+
+      {selectedDb === "faiss" && (
+        <div className="py-12 flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
+          <div className="h-16 w-16 bg-sandy/10 rounded-2xl flex items-center justify-center">
+            <Image src="/tech-icons/meta-color.svg" alt="Meta/FAISS" width={40} height={40} className="h-10 w-10 opacity-50 grayscale" />
+          </div>
+          <div className="space-y-2 max-w-sm">
+            <h3 className="text-gunmetal font-semibold text-lg">FAISS (Meta AI)</h3>
+            <p className="text-silver-dark text-sm">
+              Local FAISS index generation and export is planned. This will allow for high-performance local vector search without a cloud database.
+            </p>
           </div>
         </div>
       )}

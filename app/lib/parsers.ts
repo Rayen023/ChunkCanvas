@@ -44,24 +44,45 @@ async function parsePlainText(file: File): Promise<string> {
 // ─── Excel Pipeline Parser ────────────────────────────────────────────────
 
 export async function getExcelSheets(file: File): Promise<string[]> {
-  const XLSX = await import("xlsx");
+  const ExcelJS = await import("exceljs");
+  const workbook = new ExcelJS.Workbook();
   const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: "array" });
-  return workbook.SheetNames;
+  await workbook.xlsx.load(arrayBuffer);
+  return workbook.worksheets.map((ws) => ws.name);
 }
 
 export async function getExcelColumns(file: File, sheetName?: string): Promise<string[]> {
-  const XLSX = await import("xlsx");
+  const ExcelJS = await import("exceljs");
+  const workbook = new ExcelJS.Workbook();
   const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: "array" });
-  const sheet = sheetName ? workbook.Sheets[sheetName] : workbook.Sheets[workbook.SheetNames[0]];
+  await workbook.xlsx.load(arrayBuffer);
+  
+  const sheet = sheetName 
+    ? workbook.getWorksheet(sheetName) 
+    : workbook.worksheets[0];
+    
   if (!sheet) return [];
   
-  const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-    header: 1,
+  // Get the first row (header)
+  const firstRow = sheet.getRow(1);
+  if (!firstRow) return [];
+  
+  const columns: string[] = [];
+  firstRow.eachCell((cell) => {
+    const value = cell.value;
+    if (value && typeof value === "object") {
+      if ("result" in value) columns.push(String(value.result ?? ""));
+      else if ("richText" in value && Array.isArray(value.richText)) {
+        columns.push(value.richText.map((rt: { text?: string }) => rt.text ?? "").join(""));
+      }
+      else if ("text" in value) columns.push(String(value.text));
+      else columns.push(String(value));
+    } else {
+      columns.push(String(value ?? ""));
+    }
   });
-  if (data.length === 0) return [];
-  return Object.values(data[0] as Record<string, unknown>).map(String);
+  
+  return columns.filter(c => c.trim().length > 0);
 }
 
 export async function parseExcel(
@@ -69,19 +90,62 @@ export async function parseExcel(
   columnName: string,
   sheetName?: string,
 ): Promise<{ text: string; rows: string[] }> {
-  const XLSX = await import("xlsx");
+  const ExcelJS = await import("exceljs");
+  const workbook = new ExcelJS.Workbook();
   const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: "array" });
-  const sheet = sheetName ? workbook.Sheets[sheetName] : workbook.Sheets[workbook.SheetNames[0]];
+  await workbook.xlsx.load(arrayBuffer);
+  
+  const sheet = sheetName 
+    ? workbook.getWorksheet(sheetName) 
+    : workbook.worksheets[0];
+    
   if (!sheet) throw new Error(`Sheet "${sheetName}" not found`);
 
-  const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+  // Find column index
+  const firstRow = sheet.getRow(1);
+  let colIndex = -1;
+  firstRow.eachCell((cell, colNumber) => {
+    let val = "";
+    const value = cell.value;
+    if (value && typeof value === "object") {
+      if ("result" in value) val = String(value.result ?? "");
+      else if ("richText" in value && Array.isArray(value.richText)) {
+        val = value.richText.map((rt: { text?: string }) => rt.text ?? "").join("");
+      }
+      else if ("text" in value) val = String(value.text);
+      else val = String(value);
+    } else {
+      val = String(value ?? "");
+    }
 
-  const rows = data
-    .map((row) => String(row[columnName] ?? ""))
-    .filter((r) => r.trim().length > 0);
+    if (val === columnName) {
+      colIndex = colNumber;
+    }
+  });
 
-  return { text: rows.join("\n\n"), rows };
+  if (colIndex === -1) throw new Error(`Column "${columnName}" not found`);
+
+  const rows: string[] = [];
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return; // Skip header
+    const cell = row.getCell(colIndex);
+    const value = cell.value;
+    if (value !== null && value !== undefined) {
+      if (typeof value === "object") {
+        if ("result" in value) rows.push(String(value.result ?? ""));
+        else if ("richText" in value && Array.isArray(value.richText)) {
+          rows.push(value.richText.map((rt: { text?: string }) => rt.text ?? "").join(""));
+        }
+        else if ("text" in value) rows.push(String(value.text));
+        else rows.push(String(value));
+      } else {
+        rows.push(String(value));
+      }
+    }
+  });
+
+  const filteredRows = rows.filter((r) => r.trim().length > 0);
+  return { text: filteredRows.join("\n\n"), rows: filteredRows };
 }
 
 // ─── Main Parser Dispatch ─────────────────────────────────────────────────

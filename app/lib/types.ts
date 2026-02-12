@@ -96,9 +96,11 @@ export interface PineconeEnvironment {
   region: string;
 }
 
+export type ChromaMode = "local" | "cloud";
+
 // ─── Chunking Parameters ─────────────────────────────────────────────────
 
-export type ChunkingType = "recursive" | "parent-child";
+export type ChunkingType = "recursive";
 
 export interface ChunkingParams {
   chunkingType: ChunkingType;

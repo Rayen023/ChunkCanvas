@@ -30,7 +30,7 @@ const STEPS = [
     num: 4,
     title: "Chunking",
     short: "Configure chunking and view chunks.",
-    detail: "Select a chunking strategy, adjust parameters, and preview the resulting chunks.",
+    detail: "Adjust parameters for the LangChain recursive text splitter and preview the resulting chunks.",
     badge: null,
   },
   {

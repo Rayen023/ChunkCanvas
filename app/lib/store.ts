@@ -5,7 +5,7 @@
  */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ChunkingParams, EmbeddingProvider, PdfEngine, ParsedFileResult, PineconeFieldMapping, ExtPipelineConfig } from "./types";
+import type { ChunkingParams, EmbeddingProvider, PdfEngine, ParsedFileResult, PineconeFieldMapping, ExtPipelineConfig, ChromaMode } from "./types";
 import { DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP, DEFAULT_SEPARATORS, DEFAULT_OLLAMA_ENDPOINT, DEFAULT_EMBEDDING_DIMENSIONS, DEFAULT_VLLM_ENDPOINT, DEFAULT_VLLM_EMBEDDING_ENDPOINT } from "./constants";
 
 function fnv1a32(input: string): string {
@@ -114,6 +114,18 @@ export interface AppState {
   pineconeError: string | null;
   pineconeSuccess: string | null;
 
+  // ── Step 7 — Chroma ───────────────────────────
+  chromaMode: ChromaMode;
+  chromaLocalUrl: string;
+  chromaApiKey: string;
+  chromaTenant: string;
+  chromaDatabase: string;
+  chromaCollectionName: string;
+  chromaCollections: string[];
+  isUploadingChroma: boolean;
+  chromaError: string | null;
+  chromaSuccess: string | null;
+
   // ── UI state ───────────────────────────────────
   allChunksCollapsed: boolean;
 
@@ -220,6 +232,17 @@ export interface AppActions {
   setIsUploadingPinecone: (v: boolean) => void;
   setPineconeError: (err: string | null) => void;
   setPineconeSuccess: (msg: string | null) => void;
+
+  setChromaMode: (mode: ChromaMode) => void;
+  setChromaLocalUrl: (url: string) => void;
+  setChromaApiKey: (key: string) => void;
+  setChromaTenant: (tenant: string) => void;
+  setChromaDatabase: (db: string) => void;
+  setChromaCollectionName: (name: string) => void;
+  setChromaCollections: (collections: string[]) => void;
+  setIsUploadingChroma: (v: boolean) => void;
+  setChromaError: (err: string | null) => void;
+  setChromaSuccess: (msg: string | null) => void;
 
   // Sidebar
   setSidebarCollapsed: (v: boolean) => void;
@@ -342,7 +365,17 @@ export const useAppStore = create<AppState & AppActions>()(
   isUploadingPinecone: false,
   pineconeError: null,
   pineconeSuccess: null,
-  allChunksCollapsed: false,
+  chromaMode: "local",
+  chromaLocalUrl: "http://localhost:8000",
+  chromaApiKey: "",
+  chromaTenant: "",
+  chromaDatabase: "",
+  chromaCollectionName: "",
+  chromaCollections: [],
+  isUploadingChroma: false,
+  chromaError: null,
+  chromaSuccess: null,
+  allChunksCollapsed: true,
   sidebarCollapsed: false,
   sidebarWidth: 288,
   scrollActiveStep: null,
@@ -395,6 +428,8 @@ export const useAppStore = create<AppState & AppActions>()(
         embeddingChunkCache: {},
         pineconeSuccess: null,
         pineconeError: null,
+        chromaSuccess: null,
+        chromaError: null,
       });
       return;
     }
@@ -422,84 +457,143 @@ export const useAppStore = create<AppState & AppActions>()(
     set({ files: nextFiles, pipelinesByExt: nextPipelinesByExt, configByExt: nextConfigByExt, pipeline: vals[0] || state.pipeline || "" });
   },
   removeFile: (index) => {
-    set((s) => {
-      const next = s.files.filter((_, i) => i !== index);
-      const removed = s.files[index];
-      const remainingExts = new Set(next.map(f => f.name.split(".").pop()?.toLowerCase() ?? ""));
-      const nextPipelines = { ...s.pipelinesByExt };
-      const nextConfig = { ...s.configByExt };
-      for (const ext of Object.keys(nextPipelines)) {
-        if (!remainingExts.has(ext)) {
-          delete nextPipelines[ext];
-          delete nextConfig[ext];
-        }
-      }
-      const vals = Object.values(nextPipelines).filter(Boolean);
+    const s = get();
+    const next = s.files.filter((_, i) => i !== index);
+    const removed = s.files[index];
 
-      // Also remove any active parsed results for this file; keep cache entries for other files.
-      const removedName = removed?.name;
-      const nextParsedResults = removedName
-        ? s.parsedResults.filter((r) => r.filename !== removedName)
-        : s.parsedResults;
-
-      // Best-effort: drop cached parses for the removed filename to avoid unbounded growth.
-      const nextParseCache: Record<string, ParsedFileResult> = {};
-      for (const [k, v] of Object.entries(s.parseCache)) {
-        if (removedName && v.filename === removedName) continue;
-        nextParseCache[k] = v;
-      }
-
-      // Remove chunks sourced from the removed file.
-      let nextEditedChunks = s.editedChunks;
-      let nextChunkSources = s.chunkSourceFiles;
-      if (removedName && s.chunkSourceFiles.length === s.editedChunks.length) {
-        const keepIdx: number[] = [];
-        for (let i = 0; i < s.chunkSourceFiles.length; i++) {
-          if (s.chunkSourceFiles[i] !== removedName) keepIdx.push(i);
-        }
-        nextEditedChunks = keepIdx.map((i) => s.editedChunks[i]);
-        nextChunkSources = keepIdx.map((i) => s.chunkSourceFiles[i]);
-      }
-      const nextChunksHash = hashChunks(nextEditedChunks);
-
-      // Recompute combined parsedContent from remaining parsed results (if present)
-      const combinedContent = nextParsedResults
-        .map((r) => (nextParsedResults.length > 1 ? `\n═══ ${r.filename} ═══\n${r.content}` : r.content))
-        .join("\n\n");
-
-      const nextParsedFilename =
-        nextParsedResults.length === 0
-          ? ""
-          : nextParsedResults.length === 1
-            ? nextParsedResults[0].filename
-            : `${nextParsedResults.length} files`;
-      const uniquePipelines = [...new Set(nextParsedResults.map((r) => r.pipeline))];
-      const nextParsedDocType =
-        nextParsedResults.length === 0
-          ? ""
-          : uniquePipelines.length === 1
-            ? uniquePipelines[0]
-            : "Mixed pipelines";
-      const allExcelRows = nextParsedResults.filter((r) => r.excelRows).flatMap((r) => r.excelRows ?? []);
-
-      return {
-        files: next,
-        pipelinesByExt: nextPipelines,
-        pipeline: vals[0] || "",
-        configByExt: nextConfig,
-        parsedResults: nextParsedResults,
-        parsedContent: nextParsedResults.length > 0 ? combinedContent : s.parsedContent,
-        parsedFilename: nextParsedFilename,
-        parsedDocType: nextParsedDocType,
-        parsedExcelRows: allExcelRows.length > 0 ? allExcelRows : null,
-        parseCache: nextParseCache,
-        editedChunks: nextEditedChunks,
-        chunkSourceFiles: nextChunkSources,
-        chunksHash: nextChunksHash,
-        // Mark embeddings as potentially stale if chunks changed
+    // If no files remain, perform a full transient reset
+    if (next.length === 0) {
+      set({
+        files: [],
+        pipeline: "",
+        pipelinesByExt: {},
+        configByExt: {},
+        parsedContent: null,
+        parsedFilename: "",
+        parsedDocType: "",
+        parsedExcelRows: null,
+        parseError: null,
+        parseProgress: 0,
+        parseProgressMsg: "",
+        parsedResults: [],
+        currentProcessingFile: "",
+        parseCache: {},
+        editedChunks: [],
+        chunkSourceFiles: [],
+        isChunking: false,
+        chunksHash: hashChunks([]),
+        embeddingsData: null,
         embeddingsForChunksHash: null,
+        embeddingError: null,
+        embeddingChunkCache: {},
         pineconeSuccess: null,
-      };
+        pineconeError: null,
+        chromaSuccess: null,
+        chromaError: null,
+      });
+      return;
+    }
+
+    const remainingExts = new Set(next.map((f) => f.name.split(".").pop()?.toLowerCase() ?? ""));
+    const nextPipelines = { ...s.pipelinesByExt };
+    const nextConfig = { ...s.configByExt };
+    for (const ext of Object.keys(nextPipelines)) {
+      if (!remainingExts.has(ext)) {
+        delete nextPipelines[ext];
+        delete nextConfig[ext];
+      }
+    }
+    const vals = Object.values(nextPipelines).filter(Boolean);
+
+    // Also remove any active parsed results for this file; keep cache entries for other files.
+    const removedName = removed?.name;
+    const nextParsedResults = removedName
+      ? s.parsedResults.filter((r) => r.filename !== removedName)
+      : s.parsedResults;
+
+    // Best-effort: drop cached parses for the removed filename to avoid unbounded growth.
+    const nextParseCache: Record<string, ParsedFileResult> = {};
+    for (const [k, v] of Object.entries(s.parseCache)) {
+      if (removedName && v.filename === removedName) continue;
+      nextParseCache[k] = v;
+    }
+
+    // Remove chunks sourced from the removed file.
+    let nextEditedChunks = s.editedChunks;
+    let nextChunkSources = s.chunkSourceFiles;
+    let nextEmbeddingsData = s.embeddingsData;
+    let nextEmbeddingsHash = null;
+
+    if (removedName && s.chunkSourceFiles.length === s.editedChunks.length) {
+      const keepIdx: number[] = [];
+      for (let i = 0; i < s.chunkSourceFiles.length; i++) {
+        if (s.chunkSourceFiles[i] !== removedName) keepIdx.push(i);
+      }
+      nextEditedChunks = keepIdx.map((i) => s.editedChunks[i]);
+      nextChunkSources = keepIdx.map((i) => s.chunkSourceFiles[i]);
+
+      // Filter embeddings if they were in sync with chunks
+      if (s.embeddingsData && s.embeddingsData.length === s.editedChunks.length) {
+        nextEmbeddingsData = keepIdx.map((i) => s.embeddingsData![i]);
+        if (nextEmbeddingsData.length === 0) {
+          nextEmbeddingsData = null;
+          nextEmbeddingsHash = null;
+        } else {
+          // Re-hash to keep them "fresh" if they still match the remaining chunks
+          nextEmbeddingsHash = hashChunks(nextEditedChunks);
+        }
+      }
+    } else if (removedName) {
+      // Fallback: if we can't reliably sync, clear chunks/embeddings derived from multiple files
+      // but only if the removed file was part of them (best effort).
+      // If chunkSourceFiles isn't in sync, we might have to be more aggressive.
+      nextEmbeddingsData = null;
+      nextEmbeddingsHash = null;
+    }
+
+    const nextChunksHash = hashChunks(nextEditedChunks);
+
+    // Recompute combined parsedContent from remaining parsed results (if present)
+    const combinedContent =
+      nextParsedResults.length === 0
+        ? null
+        : nextParsedResults
+            .map((r) => (nextParsedResults.length > 1 ? `\n═══ ${r.filename} ═══\n${r.content}` : r.content))
+            .join("\n\n");
+
+    const nextParsedFilename =
+      nextParsedResults.length === 0
+        ? ""
+        : nextParsedResults.length === 1
+          ? nextParsedResults[0].filename
+          : `${nextParsedResults.length} files`;
+    const uniquePipelines = [...new Set(nextParsedResults.map((r) => r.pipeline))];
+    const nextParsedDocType =
+      nextParsedResults.length === 0
+        ? ""
+        : uniquePipelines.length === 1
+          ? uniquePipelines[0]
+          : "Mixed pipelines";
+    const allExcelRows = nextParsedResults.filter((r) => r.excelRows).flatMap((r) => r.excelRows ?? []);
+
+    set({
+      files: next,
+      pipelinesByExt: nextPipelines,
+      pipeline: vals[0] || "",
+      configByExt: nextConfig,
+      parsedResults: nextParsedResults,
+      parsedContent: combinedContent,
+      parsedFilename: nextParsedFilename,
+      parsedDocType: nextParsedDocType,
+      parsedExcelRows: allExcelRows.length > 0 ? allExcelRows : null,
+      parseCache: nextParseCache,
+      editedChunks: nextEditedChunks,
+      chunkSourceFiles: nextChunkSources,
+      chunksHash: nextChunksHash,
+      embeddingsData: nextEmbeddingsData,
+      embeddingsForChunksHash: nextEmbeddingsHash,
+      pineconeSuccess: null,
+      chromaSuccess: null,
     });
   },
   setPipeline: (pipeline) => {
@@ -587,6 +681,7 @@ export const useAppStore = create<AppState & AppActions>()(
       // Embeddings now correspond to a different chunk set until regenerated.
       embeddingsForChunksHash: null,
       pineconeSuccess: null,
+      chromaSuccess: null,
     }),
   updateChunk: (index, text) =>
     set((s) => {
@@ -597,15 +692,40 @@ export const useAppStore = create<AppState & AppActions>()(
         chunksHash: hashChunks(next),
         embeddingsForChunksHash: null,
         pineconeSuccess: null,
+        chromaSuccess: null,
       };
     }),
   deleteChunk: (index) =>
-    set((s) => ({
-      editedChunks: s.editedChunks.filter((_, i) => i !== index),
-      chunksHash: hashChunks(s.editedChunks.filter((_, i) => i !== index)),
-      embeddingsForChunksHash: null,
-      pineconeSuccess: null,
-    })),
+    set((s) => {
+      const nextEditedChunks = s.editedChunks.filter((_, i) => i !== index);
+      const nextChunksHash = hashChunks(nextEditedChunks);
+      const nextChunkSources =
+        s.chunkSourceFiles.length === s.editedChunks.length
+          ? s.chunkSourceFiles.filter((_, i) => i !== index)
+          : s.chunkSourceFiles;
+
+      let nextEmbeddingsData = s.embeddingsData;
+      let nextEmbeddingsHash = null;
+      if (s.embeddingsData && s.embeddingsData.length === s.editedChunks.length) {
+        nextEmbeddingsData = s.embeddingsData.filter((_, i) => i !== index);
+        if (nextEmbeddingsData.length === 0) {
+          nextEmbeddingsData = null;
+          nextEmbeddingsHash = null;
+        } else {
+          nextEmbeddingsHash = nextChunksHash;
+        }
+      }
+
+      return {
+        editedChunks: nextEditedChunks,
+        chunkSourceFiles: nextChunkSources,
+        chunksHash: nextChunksHash,
+        embeddingsData: nextEmbeddingsData,
+        embeddingsForChunksHash: nextEmbeddingsHash,
+        pineconeSuccess: null,
+        chromaSuccess: null,
+      };
+    }),
   setIsChunking: (v) => set({ isChunking: v }),
   setChunkSourceFiles: (files) => set({ chunkSourceFiles: files }),
 
@@ -640,6 +760,17 @@ export const useAppStore = create<AppState & AppActions>()(
   setIsUploadingPinecone: (v) => set({ isUploadingPinecone: v }),
   setPineconeError: (err) => set({ pineconeError: err }),
   setPineconeSuccess: (msg) => set({ pineconeSuccess: msg }),
+
+  setChromaMode: (mode) => set({ chromaMode: mode }),
+  setChromaLocalUrl: (url) => set({ chromaLocalUrl: url }),
+  setChromaApiKey: (key) => set({ chromaApiKey: key }),
+  setChromaTenant: (tenant) => set({ chromaTenant: tenant }),
+  setChromaDatabase: (db) => set({ chromaDatabase: db }),
+  setChromaCollectionName: (name) => set({ chromaCollectionName: name }),
+  setChromaCollections: (collections) => set({ chromaCollections: collections }),
+  setIsUploadingChroma: (v) => set({ isUploadingChroma: v }),
+  setChromaError: (err) => set({ chromaError: err }),
+  setChromaSuccess: (msg) => set({ chromaSuccess: msg }),
 
   setAllChunksCollapsed: (v) => set({ allChunksCollapsed: v }),
 
@@ -734,7 +865,17 @@ export const useAppStore = create<AppState & AppActions>()(
       isUploadingPinecone: false,
       pineconeError: null,
       pineconeSuccess: null,
-      allChunksCollapsed: false,
+      chromaMode: s.chromaMode || "local",
+      chromaLocalUrl: s.chromaLocalUrl || "http://localhost:8000",
+      chromaApiKey: "",
+      chromaTenant: s.chromaTenant || "",
+      chromaDatabase: s.chromaDatabase || "",
+      chromaCollectionName: s.chromaCollectionName || "",
+      chromaCollections: [],
+      isUploadingChroma: false,
+      chromaError: null,
+      chromaSuccess: null,
+      allChunksCollapsed: true,
       scrollActiveStep: null,
       sidebarWidth: 288,
       // Keep persisted preferences intact (not cleared on reset)
@@ -769,6 +910,8 @@ export const useAppStore = create<AppState & AppActions>()(
     if (fromStep <= 5) {
       resets.pineconeSuccess = null;
       resets.pineconeError = null;
+      resets.chromaSuccess = null;
+      resets.chromaError = null;
     }
     set(resets);
   },
@@ -831,10 +974,16 @@ export const useAppStore = create<AppState & AppActions>()(
         pineconeNamespace: state.pineconeNamespace,
         pineconeFieldMapping: state.pineconeFieldMapping,
 
+        // Chroma settings
+        chromaMode: state.chromaMode,
+        chromaLocalUrl: state.chromaLocalUrl,
+        chromaCollectionName: state.chromaCollectionName,
+
         // Chunking settings
         chunkingParams: state.chunkingParams,
 
         // UI preferences
+        allChunksCollapsed: state.allChunksCollapsed,
         sidebarCollapsed: state.sidebarCollapsed,
         sidebarWidth: state.sidebarWidth,
         // Theme removed
@@ -879,7 +1028,10 @@ export const useAppStore = create<AppState & AppActions>()(
           isUploadingPinecone: false,
           pineconeError: null,
           pineconeSuccess: null,
-          allChunksCollapsed: false,
+          chromaCollections: [],
+          isUploadingChroma: false,
+          chromaError: null,
+          chromaSuccess: null,
           scrollActiveStep: null,
           envKeys: { openrouter: "", voyage: "", cohere: "", pinecone: "" },
         };
