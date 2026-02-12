@@ -10,6 +10,12 @@ export async function downloadJson(data: unknown, filename: string) {
   saveAs(blob, filename);
 }
 
+export async function downloadString(content: string, filename: string, mimeType = "text/plain") {
+  const blob = new Blob([content], { type: mimeType });
+  const { saveAs } = await import("file-saver");
+  saveAs(blob, filename);
+}
+
 export async function downloadZip(
   files: Record<string, string>,
   zipFilename: string,

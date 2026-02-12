@@ -4,8 +4,10 @@ import Image from "next/image";
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useAppStore } from "@/app/lib/store";
 import { VOYAGE_MODELS, COHERE_MODELS, EMBEDDING_MODELS, OPENROUTER_DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_ENDPOINT } from "@/app/lib/constants";
-import DownloadScriptButton from "../downloads/DownloadScriptButton";
+import ActionRow from "@/app/components/downloads/ActionRow";
 import type { EmbeddingsJson } from "@/app/lib/types";
+import type { ScriptConfig } from "@/app/lib/script-generator";
+import { PIPELINE } from "@/app/lib/constants";
 
 interface OllamaEmbedModel {
   name: string;
@@ -102,8 +104,19 @@ export default function EmbeddingsSection() {
   const setEmbeddingError = useAppStore((s) => s.setEmbeddingError);
 
   const [downloadingJson, setDownloadingJson] = useState(false);
+  const [generatingScript, setGeneratingScript] = useState(false);
 
-  // OpenRouter embedding models — loaded from generated JSON (run `npm run update-models` to refresh)
+  // Script Dependencies
+  const chunkingParams = useAppStore((s) => s.chunkingParams);
+  const openrouterModel = useAppStore((s) => s.openrouterModel);
+  const openrouterPrompt = useAppStore((s) => s.openrouterPrompt);
+  const pdfEngine = useAppStore((s) => s.pdfEngine);
+  const excelColumn = useAppStore((s) => s.excelColumn);
+  const excelSheet = useAppStore((s) => s.excelSheet);
+  const pineconeIndexName = useAppStore((s) => s.pineconeIndexName);
+  const pineconeEnvKey = useAppStore((s) => s.pineconeEnvKey);
+
+  // ... (OpenRouter embedding models logic) ...
   const orEmbeddingModels = useMemo(() => {
     const sorted = [...EMBEDDING_MODELS];
     sorted.sort((a, b) => {
@@ -352,6 +365,46 @@ export default function EmbeddingsSection() {
       setDownloadingJson(false);
     }
   }, [embeddingsData, editedChunks, parsedFilename, pipeline, embeddingModelKey]);
+
+  const handleGenerateScript = useCallback(async () => {
+    setGeneratingScript(true);
+    try {
+      const { generatePipelineScript } = await import("@/app/lib/script-generator");
+      const { downloadZip } = await import("@/app/lib/downloads");
+      const { PINECONE_ENVIRONMENTS } = await import("@/app/lib/constants");
+
+      const env = PINECONE_ENVIRONMENTS.find((e) => e.key === pineconeEnvKey);
+      const isSpreadsheet = pipeline === PIPELINE.EXCEL_SPREADSHEET || pipeline === PIPELINE.CSV_SPREADSHEET;
+
+      const config: ScriptConfig = {
+        pipeline,
+        chunkingParams,
+        openrouterModel,
+        openrouterPrompt,
+        pdfEngine,
+        excelColumn: isSpreadsheet ? excelColumn : undefined,
+        excelSheet: isSpreadsheet ? excelSheet : undefined,
+        embeddingProvider,
+        voyageModel,
+        cohereModel,
+        openrouterEmbeddingModel,
+        embeddingDimensions,
+        pineconeIndexName,
+        pineconeCloud: env?.cloud,
+        pineconeRegion: env?.region,
+      };
+
+      const files = generatePipelineScript("embeddings", config);
+      const stem = parsedFilename.replace(/\.[^.]+$/, "") || "document";
+      await downloadZip(files as unknown as Record<string, string>, `${stem}_embeddings_pipeline.zip`);
+    } finally {
+      setGeneratingScript(false);
+    }
+  }, [
+    pipeline, chunkingParams, parsedFilename, openrouterModel, openrouterPrompt,
+    pdfEngine, excelColumn, excelSheet, embeddingProvider, voyageModel, cohereModel,
+    openrouterEmbeddingModel, embeddingDimensions, pineconeIndexName, pineconeEnvKey,
+  ]);
 
   if (editedChunks.length === 0) return null;
 
@@ -785,23 +838,14 @@ export default function EmbeddingsSection() {
             {embeddingProvider === "voyage" ? "Voyage AI" : embeddingProvider === "cohere" ? "Cohere" : embeddingProvider === "ollama" ? "Ollama" : embeddingProvider === "vllm" ? "vLLM" : "OpenRouter"}.
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button
-              onClick={handleDownloadEmbeddings}
-              disabled={downloadingJson}
-              className="flex items-center justify-center gap-2 rounded-lg bg-card border border-silver px-4 py-3 text-sm font-medium text-gunmetal hover:border-sandy hover:text-sandy transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              {downloadingJson ? "Preparing…" : "Download JSON"}
-            </button>
-
-            <DownloadScriptButton
-              stage="embeddings"
-              label="Download Script (.zip)"
-            />
-          </div>
+          <ActionRow
+            onDownload={handleDownloadEmbeddings}
+            downloadLabel="Download JSON"
+            isDownloading={downloadingJson}
+            onGenerateScript={handleGenerateScript}
+            scriptLabel="Generate Script"
+            isGeneratingScript={generatingScript}
+          />
         </div>
       )}
     </div>

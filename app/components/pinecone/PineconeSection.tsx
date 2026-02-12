@@ -3,18 +3,32 @@
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { useAppStore } from "@/app/lib/store";
-import { PINECONE_ENVIRONMENTS } from "@/app/lib/constants";
-import DownloadScriptButton from "../downloads/DownloadScriptButton";
+import { PINECONE_ENVIRONMENTS, PIPELINE } from "@/app/lib/constants";
+import ActionRow from "@/app/components/downloads/ActionRow";
+import type { ScriptConfig } from "@/app/lib/script-generator";
 
 export default function PineconeSection() {
   const editedChunks = useAppStore((s) => s.editedChunks);
   const chunkSourceFiles = useAppStore((s) => s.chunkSourceFiles);
   const parsedFilename = useAppStore((s) => s.parsedFilename);
   const embeddingsData = useAppStore((s) => s.embeddingsData);
+  const pipeline = useAppStore((s) => s.pipeline);
+  
+  // Script dependencies
+  const chunkingParams = useAppStore((s) => s.chunkingParams);
+  const openrouterModel = useAppStore((s) => s.openrouterModel);
+  const openrouterPrompt = useAppStore((s) => s.openrouterPrompt);
+  const pdfEngine = useAppStore((s) => s.pdfEngine);
+  const excelColumn = useAppStore((s) => s.excelColumn);
+  const excelSheet = useAppStore((s) => s.excelSheet);
+  const embeddingProvider = useAppStore((s) => s.embeddingProvider);
+  const voyageModel = useAppStore((s) => s.voyageModel);
+  const cohereModel = useAppStore((s) => s.cohereModel);
+  const openrouterEmbeddingModel = useAppStore((s) => s.openrouterEmbeddingModel);
+  const embeddingDimensions = useAppStore((s) => s.embeddingDimensions);
 
   const pineconeApiKey = useAppStore((s) => s.pineconeApiKey);
   const voyageApiKey = useAppStore((s) => s.voyageApiKey);
-  const voyageModel = useAppStore((s) => s.voyageModel);
   const pineconeEnvKey = useAppStore((s) => s.pineconeEnvKey);
   const pineconeIndexName = useAppStore((s) => s.pineconeIndexName);
   const pineconeIndexes = useAppStore((s) => s.pineconeIndexes);
@@ -176,6 +190,48 @@ export default function PineconeSection() {
     editedChunks, parsedFilename, setIsUploading, setPineconeError,
     setPineconeSuccess, hasEmbeddings, embeddingsData,
     pineconeNamespace, chunkSourceFiles, pineconeFieldMapping
+  ]);
+
+  const [generatingScript, setGeneratingScript] = useState(false);
+
+  const handleGenerateScript = useCallback(async () => {
+    setGeneratingScript(true);
+    try {
+      const { generatePipelineScript } = await import("@/app/lib/script-generator");
+      const { downloadZip } = await import("@/app/lib/downloads");
+      const { PINECONE_ENVIRONMENTS } = await import("@/app/lib/constants");
+
+      const env = PINECONE_ENVIRONMENTS.find((e) => e.key === pineconeEnvKey);
+      const isSpreadsheet = pipeline === PIPELINE.EXCEL_SPREADSHEET || pipeline === PIPELINE.CSV_SPREADSHEET;
+
+      const config: ScriptConfig = {
+        pipeline,
+        chunkingParams,
+        openrouterModel,
+        openrouterPrompt,
+        pdfEngine,
+        excelColumn: isSpreadsheet ? excelColumn : undefined,
+        excelSheet: isSpreadsheet ? excelSheet : undefined,
+        embeddingProvider,
+        voyageModel,
+        cohereModel,
+        openrouterEmbeddingModel,
+        embeddingDimensions,
+        pineconeIndexName,
+        pineconeCloud: env?.cloud,
+        pineconeRegion: env?.region,
+      };
+
+      const files = generatePipelineScript("pinecone", config);
+      const stem = parsedFilename.replace(/\.[^.]+$/, "") || "document";
+      await downloadZip(files as unknown as Record<string, string>, `${stem}_pinecone_pipeline.zip`);
+    } finally {
+      setGeneratingScript(false);
+    }
+  }, [
+    pipeline, chunkingParams, parsedFilename, openrouterModel, openrouterPrompt,
+    pdfEngine, excelColumn, excelSheet, embeddingProvider, voyageModel, cohereModel,
+    openrouterEmbeddingModel, embeddingDimensions, pineconeIndexName, pineconeEnvKey,
   ]);
 
   if (editedChunks.length === 0) return null;
@@ -623,9 +679,11 @@ export default function PineconeSection() {
                 </button>
 
                 {/* Script download */}
-                <DownloadScriptButton
-                  stage="pinecone"
-                  label="Download Pinecone Script (.zip)"
+                <ActionRow
+                  onGenerateScript={handleGenerateScript}
+                  scriptLabel="Generate Script"
+                  isGeneratingScript={generatingScript}
+                  scriptOnly={true}
                 />
               </div>
             </>

@@ -2,6 +2,9 @@
 
 import { useAppStore } from "@/app/lib/store";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { PIPELINE } from "@/app/lib/constants";
+import ActionRow from "@/app/components/downloads/ActionRow";
+import type { ScriptConfig } from "@/app/lib/script-generator";
 
 /** Regex matching the file separator used during multi-file parsing: ═══ filename ═══ */
 const FILE_SEP_RE = /═══ (.+?) ═══/g;
@@ -10,8 +13,30 @@ export default function ParsedDocumentView() {
   const parsedContent = useAppStore((s) => s.parsedContent);
   const setParsedContent = useAppStore((s) => s.setParsedContent);
   const isParsing = useAppStore((s) => s.isParsing);
+  const parsedResults = useAppStore((s) => s.parsedResults);
+  const parsedFilename = useAppStore((s) => s.parsedFilename);
+
+  // Script generation selectors
+  const pipeline = useAppStore((s) => s.pipeline);
+  const chunkingParams = useAppStore((s) => s.chunkingParams);
+  const openrouterModel = useAppStore((s) => s.openrouterModel);
+  const openrouterPrompt = useAppStore((s) => s.openrouterPrompt);
+  const pdfEngine = useAppStore((s) => s.pdfEngine);
+  const excelColumn = useAppStore((s) => s.excelColumn);
+  const excelSheet = useAppStore((s) => s.excelSheet);
+  const embeddingProvider = useAppStore((s) => s.embeddingProvider);
+  const voyageModel = useAppStore((s) => s.voyageModel);
+  const cohereModel = useAppStore((s) => s.cohereModel);
+  const openrouterEmbeddingModel = useAppStore((s) => s.openrouterEmbeddingModel);
+  const embeddingDimensions = useAppStore((s) => s.embeddingDimensions);
+  const pineconeIndexName = useAppStore((s) => s.pineconeIndexName);
+  const pineconeEnvKey = useAppStore((s) => s.pineconeEnvKey);
+
   const [showSaved, setShowSaved] = useState(false);
   const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [isDownloadingText, setIsDownloadingText] = useState(false);
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevLenRef = useRef(0);
   const userScrolledRef = useRef(false);
@@ -133,6 +158,75 @@ export default function ParsedDocumentView() {
     setShowSaved(true);
   };
 
+  const handleDownloadText = useCallback(async () => {
+    if (!parsedContent) return;
+    setIsDownloadingText(true);
+    try {
+      // Single file download (no zip)
+      if (parsedResults.length <= 1) {
+        const { downloadString } = await import("@/app/lib/downloads");
+        // Prefer result filename if available, else parsedFilename
+        const r = parsedResults[0];
+        const content = r ? r.content : parsedContent;
+        const fname = r ? r.filename : parsedFilename;
+        const stem = fname.replace(/\.[^/.]+$/, "");
+        await downloadString(content, `${stem}.md`, "text/markdown;charset=utf-8");
+      } else {
+        // Multi-file download (zip)
+        const { downloadZip } = await import("@/app/lib/downloads");
+        const files: Record<string, string> = {};
+        parsedResults.forEach((r) => {
+          const name = r.filename.replace(/\.[^/.]+$/, "") + ".md";
+          files[name] = r.content;
+        });
+        await downloadZip(files, "parsed_documents.zip");
+      }
+    } finally {
+      setIsDownloadingText(false);
+    }
+  }, [parsedContent, parsedResults, parsedFilename]);
+
+  const handleGenerateScript = useCallback(async () => {
+    setIsGeneratingScript(true);
+    try {
+      const { generatePipelineScript } = await import("@/app/lib/script-generator");
+      const { downloadZip } = await import("@/app/lib/downloads");
+      const { PINECONE_ENVIRONMENTS } = await import("@/app/lib/constants");
+
+      const env = PINECONE_ENVIRONMENTS.find((e) => e.key === pineconeEnvKey);
+      const isSpreadsheet = pipeline === PIPELINE.EXCEL_SPREADSHEET || pipeline === PIPELINE.CSV_SPREADSHEET;
+
+      const config: ScriptConfig = {
+        pipeline,
+        chunkingParams,
+        openrouterModel,
+        openrouterPrompt,
+        pdfEngine,
+        excelColumn: isSpreadsheet ? excelColumn : undefined,
+        excelSheet: isSpreadsheet ? excelSheet : undefined,
+        embeddingProvider,
+        voyageModel,
+        cohereModel,
+        openrouterEmbeddingModel,
+        embeddingDimensions,
+        pineconeIndexName,
+        pineconeCloud: env?.cloud,
+        pineconeRegion: env?.region,
+      };
+
+      // "chunks" stage includes reading and chunking, which is appropriate for this step
+      const files = generatePipelineScript("chunks", config);
+      const stem = parsedFilename.replace(/\.[^.]+$/, "") || "document";
+      await downloadZip(files as unknown as Record<string, string>, `${stem}_chunks_pipeline.zip`);
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  }, [
+    pipeline, chunkingParams, parsedFilename, openrouterModel, openrouterPrompt,
+    pdfEngine, excelColumn, excelSheet, embeddingProvider, voyageModel, cohereModel,
+    openrouterEmbeddingModel, embeddingDimensions, pineconeIndexName, pineconeEnvKey,
+  ]);
+
   if (parsedContent === null) return null;
 
   return (
@@ -221,6 +315,24 @@ export default function ParsedDocumentView() {
         }`}
         style={{ minHeight: "150px", maxHeight: "600px" }}
       />
+
+      {/* ── Action Buttons ─────────────────────────────────── */}
+      {!isParsing && parsedContent && (
+        <div className="pt-2">
+          <ActionRow
+            onDownload={handleDownloadText}
+            downloadLabel={
+              parsedResults.length > 1
+                ? "Download Parsed Text (.zip)"
+                : "Download Parsed Text (.md)"
+            }
+            isDownloading={isDownloadingText}
+            onGenerateScript={handleGenerateScript}
+            scriptLabel="Generate Script"
+            isGeneratingScript={isGeneratingScript}
+          />
+        </div>
+      )}
     </div>
   );
 }

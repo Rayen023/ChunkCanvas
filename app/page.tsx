@@ -19,11 +19,8 @@ const ChunkingParams = dynamic(
 const ChunkList = dynamic(
   () => import("./components/chunking/ChunkList"),
 );
-const DownloadJsonButton = dynamic(
-  () => import("./components/downloads/DownloadJsonButton"),
-);
-const DownloadScriptButton = dynamic(
-  () => import("./components/downloads/DownloadScriptButton"),
+const ChunkActions = dynamic(
+  () => import("./components/chunking/ChunkActions"),
 );
 const EmbeddingsSection = dynamic(
   () => import("./components/embeddings/EmbeddingsSection"),
@@ -427,10 +424,7 @@ export default function Home() {
               <div className="h-px bg-silver-light" />
               <ChunkList />
               <div className="h-px bg-silver-light" />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <DownloadJsonButton />
-                <DownloadScriptButton stage="chunks" label="Download Pipeline Script (.zip)" />
-              </div>
+              <ChunkActions />
             </>
           )}
         </section>
