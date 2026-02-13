@@ -103,7 +103,7 @@ const PIPELINE_META: Record<string, Omit<ProviderOption, "id" | "label">> = {
 };
 
 const PIPELINE_LABELS: Record<string, string> = {
-  [PIPELINE.SIMPLE_TEXT]: "pdfjs + mammoth",
+  [PIPELINE.SIMPLE_TEXT]: "PDF.js",
   [PIPELINE.EXCEL_SPREADSHEET]: "XLSX",
   [PIPELINE.CSV_SPREADSHEET]: "CSV Parser",
   [PIPELINE.OPENROUTER_PDF]: "OpenRouter",
@@ -232,7 +232,7 @@ export default function PipelineSelector() {
                     description={
                       selectedOption?.badge === "Cloud"
                         ? "Cloud provider selected. API key is required."
-                        : "Local provider selected."
+                        : ""
                     }
                   />
                   {selected.startsWith("OpenRouter") && (
@@ -255,7 +255,7 @@ export default function PipelineSelector() {
                   <ConfigHeader
                     title={`${selectedOption?.label || "Pipeline"} Configuration`}
                     icon={selectedOption?.icon}
-                    description="Local provider selected."
+                    description=""
                   />
                 </ConfigContainer>
               )}

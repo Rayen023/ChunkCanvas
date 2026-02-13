@@ -246,16 +246,6 @@ export default function ParsedDocumentView() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {isParsing && (
-            <div className="flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 animate-pulse">
-              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="4" cy="12" r="2" />
-                <circle cx="12" cy="12" r="2" />
-                <circle cx="20" cy="12" r="2" />
-              </svg>
-              Streaming…
-            </div>
-          )}
           <div
             className={`flex items-center gap-1.5 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 transition-all duration-300 ${
               showSaved ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
@@ -272,6 +262,11 @@ export default function ParsedDocumentView() {
             </svg>
             Saved
           </div>
+          {isParsing && (
+            <span className="text-xs font-medium text-sandy animate-pulse">
+              Streaming...
+            </span>
+          )}
           <span className="text-xs text-silver-dark bg-silver-light/50 px-2 py-0.5 rounded-full">
             {tokenCount.toLocaleString()} tokens
           </span>
@@ -346,19 +341,24 @@ export default function ParsedDocumentView() {
         </div>
       )}
 
-      <textarea
-        ref={textareaRef}
-        value={parsedContent}
-        onChange={handleChange}
-        readOnly={isParsing}
-        onScroll={handleScroll}
-        className={`parsed-document-textarea w-full rounded-xl border p-4 text-sm font-mono text-gunmetal-light resize-y focus:outline-none focus:ring-2 focus:ring-sandy/50 focus:border-sandy overflow-y-auto ${
-          isParsing
-            ? "border-blue-200 cursor-default"
-            : "border-silver-light"
-        }`}
-        style={{ minHeight: "150px", maxHeight: "600px" }}
-      />
+      <div className="relative w-full">
+        {isParsing && (
+          <div className="absolute inset-0 rounded-xl ring-2 ring-sandy animate-pulse pointer-events-none z-10" />
+        )}
+        <textarea
+          ref={textareaRef}
+          value={parsedContent}
+          onChange={handleChange}
+          readOnly={isParsing}
+          onScroll={handleScroll}
+          className={`parsed-document-textarea w-full rounded-xl border p-4 text-sm font-mono text-gunmetal-light resize-y focus:outline-none focus:ring-2 focus:ring-sandy/50 focus:border-sandy overflow-y-auto ${
+            isParsing
+              ? "border-sandy cursor-default"
+              : "border-silver-light"
+          }`}
+          style={{ minHeight: "150px", maxHeight: "600px" }}
+        />
+      </div>
 
       {/* ── Action Buttons ─────────────────────────────────── */}
       {!isParsing && parsedContent && (

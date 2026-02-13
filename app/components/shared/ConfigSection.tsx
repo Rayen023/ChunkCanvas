@@ -23,8 +23,9 @@ export function ProviderSelector({
   onSelect,
   className = "",
 }: ProviderSelectorProps) {
+  const singleOption = options.length === 1;
   return (
-    <div className={`flex flex-wrap gap-2 ${className}`}>
+    <div className={`flex ${singleOption ? "" : "flex-nowrap"} gap-2 ${className}`}>
       {options.map((option) => {
         const isSelected = selectedId === option.id;
         return (
@@ -32,10 +33,10 @@ export function ProviderSelector({
             key={option.id}
             type="button"
             onClick={() => onSelect(option.id)}
-            className={`flex-1 min-w-[140px] flex flex-col items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium border transition-colors cursor-pointer relative ${
+            className={`${singleOption ? "" : "flex-1 min-w-0"} relative flex flex-col items-center justify-center gap-1 rounded-lg px-4 pt-2.5 pb-4 text-sm font-medium border-2 transition-all duration-200 cursor-pointer ${
               isSelected
-                ? "bg-sandy text-white border-sandy shadow-sm"
-                : "bg-card text-gunmetal border-sandy hover:bg-sandy/4"
+                ? "bg-sandy text-white border-sandy shadow-md"
+                : "bg-card text-gunmetal border-silver-light shadow-sm hover:border-sandy hover:shadow-md dark:border-[#333] dark:hover:border-sandy"
             }`}
             title={option.description}
           >
@@ -44,13 +45,24 @@ export function ProviderSelector({
                 <Image
                   src={option.icon}
                   alt=""
-                  width={16}
-                  height={16}
-                  className="h-4 w-4 object-contain"
+                  width={18}
+                  height={18}
+                  className="h-[18px] w-[18px] object-contain shrink-0"
                 />
               )}
-              <span>{option.label}</span>
+              <span className="truncate">{option.label}</span>
             </div>
+            {option.badge && (
+              <span
+                className={`absolute bottom-1 right-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none ${
+                  isSelected
+                    ? "bg-white/20 text-white/80"
+                    : "text-silver-dark/70 dark:text-[#888]"
+                }`}
+              >
+                {option.badge}
+              </span>
+            )}
           </button>
         );
       })}

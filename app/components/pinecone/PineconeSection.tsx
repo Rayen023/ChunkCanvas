@@ -7,6 +7,7 @@ import { PINECONE_ENVIRONMENTS, PIPELINE } from "@/app/lib/constants";
 import ActionRow from "@/app/components/downloads/ActionRow";
 import { ProviderSelector, ConfigContainer, ConfigHeader, ProviderOption } from "@/app/components/shared/ConfigSection";
 import StatusMessage from "@/app/components/shared/StatusMessage";
+import Tooltip from "@/app/components/shared/Tooltip";
 import type { ScriptConfig } from "@/app/lib/script-generator";
 
 const DB_OPTIONS: ProviderOption[] = [
@@ -514,8 +515,8 @@ export default function PineconeSection() {
             activeDbOption?.badge === "Cloud"
               ? "Cloud provider selected. API key is required."
               : activeDbOption?.badge === "Hybrid"
-                ? "Hybrid provider selected. Local mode works without API key, cloud mode requires API key."
-                : "Local provider selected."
+                ? "Hybrid provider selected. Cloud mode requires API key."
+                : ""
           }
         />
 
@@ -554,32 +555,33 @@ export default function PineconeSection() {
                   {PINECONE_ENVIRONMENTS.map((env) => {
                     const isSelected = pineconeEnvKey === env.key;
                     return (
-                      <button
-                        key={env.key}
-                        type="button"
-                        onClick={() => setPineconeEnvKey(env.key)}
-                        className={`
-                          w-auto text-left rounded-lg border px-3 py-1.5 transition-all duration-150 cursor-pointer flex items-center gap-2
-                          ${isSelected
-                            ? "border-sandy bg-sandy/8 ring-2 ring-sandy/30"
-                            : "border-silver-light bg-card hover:border-sandy/50 hover:bg-sandy/4"
-                          }
-                        `}
-                      >
-                        <span
+                      <Tooltip key={env.key} content={env.label}>
+                        <button
+                          type="button"
+                          onClick={() => setPineconeEnvKey(env.key)}
                           className={`
-                            flex-shrink-0 h-3 w-3 rounded-full border-2 flex items-center justify-center transition-colors
-                            ${isSelected ? "border-sandy" : "border-silver"}
+                            w-auto text-left rounded-lg border px-3 py-1.5 transition-all duration-150 cursor-pointer flex items-center gap-2
+                            ${isSelected
+                              ? "border-sandy bg-sandy/8 ring-2 ring-sandy/30"
+                              : "border-silver-light bg-card hover:border-sandy/50 hover:bg-sandy/4"
+                            }
                           `}
                         >
-                          {isSelected && (
-                            <span className="h-1 w-1 rounded-full bg-sandy" />
-                          )}
-                        </span>
-                        <span className={`text-[11px] ${isSelected ? "text-gunmetal font-medium" : "text-gunmetal-light"}`}>
-                          {env.label}
-                        </span>
-                      </button>
+                          <span
+                            className={`
+                              flex-shrink-0 h-3 w-3 rounded-full border-2 flex items-center justify-center transition-colors
+                              ${isSelected ? "border-sandy" : "border-silver"}
+                            `}
+                          >
+                            {isSelected && (
+                              <span className="h-1 w-1 rounded-full bg-sandy" />
+                            )}
+                          </span>
+                          <span className={`text-[11px] truncate max-w-[100px] ${isSelected ? "text-gunmetal font-medium" : "text-gunmetal-light"}`}>
+                            {env.label}
+                          </span>
+                        </button>
+                      </Tooltip>
                     );
                   })}
                 </div>
