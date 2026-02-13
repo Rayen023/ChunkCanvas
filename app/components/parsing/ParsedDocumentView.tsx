@@ -233,11 +233,13 @@ export default function ParsedDocumentView() {
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-gunmetal whitespace-nowrap">
-            {isParsing ? "Streaming Output" : "Parsed Document"}
-          </h2>
+          {isParsing && (
+            <h2 className="text-lg font-semibold text-gunmetal whitespace-nowrap">
+              Streaming Output
+            </h2>
+          )}
           {!isParsing && (
-            <div className="flex items-center gap-1.5 text-xs text-silver-dark border-l border-silver-light/60 pl-3">
+            <div className="flex items-center gap-1.5 text-xs text-silver-dark">
               <span className="h-1 w-1 rounded-full bg-sandy" />
               Changes auto-save as you edit
             </div>
@@ -278,27 +280,69 @@ export default function ParsedDocumentView() {
 
       {/* ── File navigation tabs (multi-file only) ─────────── */}
       {fileSections.length > 1 && (
-        <div className="flex flex-wrap items-center gap-1.5 pb-1">
-          <span className="text-xs font-medium text-silver-dark whitespace-nowrap mr-1">
-            <svg className="inline h-3.5 w-3.5 -mt-0.5 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "6px",
+            paddingBottom: "4px",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: 500,
+              color: "var(--silver-dark)",
+              whiteSpace: "nowrap",
+              marginRight: "4px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "3px",
+            }}
+          >
+            <svg style={{ height: "14px", width: "14px" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
             </svg>
             Jump to:
           </span>
-          {fileSections.map((sec, i) => (
-            <button
-              key={`${sec.name}-${i}`}
-              type="button"
-              onClick={() => scrollToFile(sec.name)}
-              className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                activeFile === sec.name
-                  ? "bg-sandy text-white shadow-sm"
-                  : "bg-slate-100 text-gunmetal-light hover:bg-sandy/15 hover:text-sandy-dark"
-              }`}
-            >
-              {sec.name}
-            </button>
-          ))}
+          {fileSections.map((sec, i) => {
+            const isActive = activeFile === sec.name;
+            return (
+              <button
+                key={`${sec.name}-${i}`}
+                type="button"
+                onClick={() => scrollToFile(sec.name)}
+                style={{
+                  whiteSpace: "nowrap",
+                  borderRadius: "6px",
+                  padding: "4px 10px",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  border: isActive ? "1.5px solid #F2A365" : "1.5px solid var(--silver-dark)",
+                  backgroundColor: isActive ? "#F2A365" : "var(--card)",
+                  color: isActive ? "#ffffff" : "var(--gunmetal)",
+                  boxShadow: isActive ? "0 1px 3px rgba(242,163,101,0.3)" : "none",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.borderColor = "#F2A365";
+                    e.currentTarget.style.color = "#F2A365";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.borderColor = "var(--silver-dark)";
+                    e.currentTarget.style.color = "var(--gunmetal)";
+                  }
+                }}
+              >
+                {sec.name}
+              </button>
+            );
+          })}
         </div>
       )}
 

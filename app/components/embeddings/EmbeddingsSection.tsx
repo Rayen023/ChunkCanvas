@@ -1,13 +1,22 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useAppStore } from "@/app/lib/store";
 import { VOYAGE_MODELS, COHERE_MODELS, EMBEDDING_MODELS, OPENROUTER_DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_ENDPOINT, DEFAULT_EMBEDDING_DIMENSIONS } from "@/app/lib/constants";
 import ActionRow from "@/app/components/downloads/ActionRow";
+import { ProviderSelector, ConfigContainer, ConfigHeader, ProviderOption } from "@/app/components/shared/ConfigSection";
+import StatusMessage from "@/app/components/shared/StatusMessage";
 import type { EmbeddingsJson } from "@/app/lib/types";
 import type { ScriptConfig } from "@/app/lib/script-generator";
 import { PIPELINE } from "@/app/lib/constants";
+
+const PROVIDER_OPTIONS: ProviderOption[] = [
+  { id: "openrouter", label: "OpenRouter", icon: "/tech-icons/openrouter.svg", badge: "Cloud", requiresApiKey: true },
+  { id: "voyage", label: "Voyage AI", icon: "/tech-icons/voyage-color.svg", badge: "Cloud", requiresApiKey: true },
+  { id: "cohere", label: "Cohere", icon: "/tech-icons/cohere-color.svg", badge: "Cloud", requiresApiKey: true },
+  { id: "ollama", label: "Ollama", icon: "/tech-icons/ollama.svg", badge: "Local", requiresApiKey: false },
+  { id: "vllm", label: "vLLM", icon: "/tech-icons/vllm-color.svg", badge: "Local", requiresApiKey: false },
+];
 
 function fnv1a32(input: string): string {
   let hash = 0x811c9dc5;
@@ -177,7 +186,7 @@ export default function EmbeddingsSection() {
     ) {
       setOpenrouterEmbeddingModel(orEmbeddingModels[0].id);
     }
-  }, [orEmbeddingModels, openrouterEmbeddingModel, embeddingProvider, setOpenrouterEmbeddingModel]);
+  }, [orEmbeddingModels, openrouterEmbeddingModel, embeddingProvider, setOpenrouterEmbeddingModel, embeddingDimensions]);
 
   // Fetch Ollama embedding models when provider is ollama
   const fetchOllamaEmbedModels = useCallback(async () => {
@@ -322,7 +331,7 @@ export default function EmbeddingsSection() {
       // Fallback if somehow reset to 0
       setEmbeddingDimensions(userDesiredDimensions || DEFAULT_EMBEDDING_DIMENSIONS);
     }
-  }, [selectedModelMaxDimensions, userDesiredDimensions, setEmbeddingDimensions]);
+  }, [selectedModelMaxDimensions, userDesiredDimensions, setEmbeddingDimensions, embeddingDimensions]);
 
   const embeddingDimsForCache = useMemo(() => {
     if (embeddingProvider === "voyage") {
@@ -553,6 +562,8 @@ export default function EmbeddingsSection() {
 
   if (editedChunks.length === 0) return null;
 
+  const activeProviderOption = PROVIDER_OPTIONS.find((p) => p.id === embeddingProvider);
+
   return (
     <div className="bg-card rounded-xl shadow-sm border border-silver-light p-6 space-y-4">
       <h2 className="text-lg font-semibold text-gunmetal">
@@ -567,349 +578,309 @@ export default function EmbeddingsSection() {
         <label className="block text-sm font-medium text-gunmetal mb-2">
           Embedding Provider
         </label>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setEmbeddingProvider("openrouter")}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
-              embeddingProvider === "openrouter"
-                ? "bg-sandy text-white border-sandy shadow-sm"
-                : "bg-card text-gunmetal border-silver hover:border-sandy hover:bg-sandy/4"
-            }`}
-          >
-            <Image src="/tech-icons/openrouter.svg" alt="" width={16} height={16} className={`h-4 w-4 ${embeddingProvider === "openrouter" ? "brightness-0 invert" : ""}`} />
-            OpenRouter
-          </button>
-          <button
-            onClick={() => setEmbeddingProvider("voyage")}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
-              embeddingProvider === "voyage"
-                ? "bg-sandy text-white border-sandy shadow-sm"
-                : "bg-card text-gunmetal border-silver hover:border-sandy hover:bg-sandy/4"
-            }`}
-          >
-            <Image src="/tech-icons/voyage-color.svg" alt="" width={16} height={16} className={`h-4 w-4 ${embeddingProvider === "voyage" ? "brightness-0 invert" : ""}`} />
-            Voyage AI
-          </button>
-          <button
-            onClick={() => setEmbeddingProvider("cohere")}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
-              embeddingProvider === "cohere"
-                ? "bg-sandy text-white border-sandy shadow-sm"
-                : "bg-card text-gunmetal border-silver hover:border-sandy hover:bg-sandy/4"
-            }`}
-          >
-            <Image src="/tech-icons/cohere-color.svg" alt="" width={16} height={16} className={`h-4 w-4 ${embeddingProvider === "cohere" ? "brightness-0 invert" : ""}`} />
-            Cohere
-          </button>
-          <button
-            onClick={() => setEmbeddingProvider("ollama")}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
-              embeddingProvider === "ollama"
-                ? "bg-sandy text-white border-sandy shadow-sm"
-                : "bg-card text-gunmetal border-silver hover:border-sandy hover:bg-sandy/4"
-            }`}
-          >
-            <Image src="/tech-icons/ollama.svg" alt="" width={16} height={16} className={`h-4 w-4 ${embeddingProvider === "ollama" ? "brightness-0 invert" : ""}`} />
-            Ollama
-          </button>
-          <button
-            onClick={() => setEmbeddingProvider("vllm")}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium border transition-colors cursor-pointer ${
-              embeddingProvider === "vllm"
-                ? "bg-sandy text-white border-sandy shadow-sm"
-                : "bg-card text-gunmetal border-silver hover:border-sandy hover:bg-sandy/4"
-            }`}
-          >
-            <Image src="/tech-icons/vllm-color.svg" alt="" width={16} height={16} className={`h-4 w-4 ${embeddingProvider === "vllm" ? "brightness-0 invert" : ""}`} />
-            vLLM
-          </button>
-        </div>
+        <ProviderSelector
+          options={PROVIDER_OPTIONS}
+          selectedId={embeddingProvider}
+          onSelect={(id) => setEmbeddingProvider(id as "openrouter" | "voyage" | "cohere" | "ollama" | "vllm")}
+        />
       </div>
 
-      {/* ── OpenRouter Embeddings ── */}
-      {embeddingProvider === "openrouter" && (
-        <>
-          {/* API Key */}
-          <div>
-            <label className="block text-sm font-medium text-gunmetal mb-1">
-              OpenRouter API Key
-            </label>
-            <input
-              type="password"
-              value={openrouterApiKey}
-              onChange={(e) => setOpenrouterApiKey(e.target.value)}
-              placeholder="sk-or-..."
-              className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
-            />
-            {!openrouterApiKey && (
-              <p className="mt-1 text-xs text-amber-600">
-                An OpenRouter API key is required.
-              </p>
-            )}
-          </div>
+      <ConfigContainer active>
+        <ConfigHeader
+          title={`${activeProviderOption?.label || "Provider"} Configuration`}
+          icon={activeProviderOption?.icon}
+          description={
+            activeProviderOption?.badge === "Cloud"
+              ? "Cloud provider selected. API key is required."
+              : "Local provider selected."
+          }
+        />
 
-          {/* OR Embedding Model */}
-          <div>
-            <label className="block text-sm font-medium text-gunmetal mb-1">
-              Embedding Model
-              <span className="ml-2 text-xs text-silver-dark font-normal">
-                ({orEmbeddingModels.length} models)
-              </span>
-            </label>
-            <select
-              value={openrouterEmbeddingModel}
-              onChange={(e) => setOpenrouterEmbeddingModel(e.target.value)}
-              className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none"
-            >
-              {orEmbeddingModels.map((m) => {
-                const inPrice = formatPricing(m.pricing.prompt);
-                const outPrice = formatPricing(m.pricing.completion);
-                const ctx = formatCtx(m.context_length);
-                const dims = m.dimensions;
-                const dimsLabel = dims ? `${dims}d` : "";
-                return (
-                  <option key={m.id} value={m.id}>
-                    {m.name} ({m.id}) — In: {inPrice} · Out: {outPrice}{dimsLabel ? ` · ${dimsLabel}` : ""} · {ctx} ctx
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-        </>
-      )}
-
-      {/* ── Voyage AI Embeddings ── */}
-      {embeddingProvider === "voyage" && (
-        <>
-          {/* API Key */}
-          <div>
-            <label className="block text-sm font-medium text-gunmetal mb-1">
-              Voyage AI API Key
-            </label>
-            <input
-              type="password"
-              value={voyageApiKey}
-              onChange={(e) => setVoyageApiKey(e.target.value)}
-              placeholder="pa-..."
-              className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
-            />
-          </div>
-
-          {/* Voyage Model */}
-          <div>
-            <label className="block text-sm font-medium text-gunmetal mb-1">
-              Embedding Model
-            </label>
-            <select
-              value={voyageModel}
-              onChange={(e) => setVoyageModel(e.target.value)}
-              className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none"
-            >
-              {VOYAGE_MODELS.map((m) => (
-                <option key={m.key} value={m.key}>
-                  {m.label} — {m.description} ({m.dimensions}d)
-                </option>
-              ))}
-            </select>
-          </div>
-        </>
-      )}
-
-      {/* ── Cohere Embeddings ── */}
-      {embeddingProvider === "cohere" && (
-        <>
-          {/* API Key */}
-          <div>
-            <label className="block text-sm font-medium text-gunmetal mb-1">
-              Cohere API Key
-            </label>
-            <input
-              type="password"
-              value={cohereApiKey}
-              onChange={(e) => setCohereApiKey(e.target.value)}
-              placeholder="your-api-key"
-              className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
-            />
-          </div>
-
-          {/* Cohere Model */}
-          <div>
-            <label className="block text-sm font-medium text-gunmetal mb-1">
-              Embedding Model
-            </label>
-            <select
-              value={cohereModel}
-              onChange={(e) => setCohereModel(e.target.value)}
-              className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none"
-            >
-              {COHERE_MODELS.map((m) => (
-                <option key={m.key} value={m.key}>
-                  {m.label} — {m.description} ({m.dimensions}d)
-                </option>
-              ))}
-            </select>
-          </div>
-        </>
-      )}
-
-      {/* ── Ollama Embeddings ── */}
-      {embeddingProvider === "ollama" && (
-        <>
-          {/* Endpoint */}
-          <div>
-            <label className="block text-sm font-medium text-gunmetal mb-1">
-              Ollama Endpoint
-            </label>
-            <input
-              type="text"
-              value={ollamaEmbeddingEndpoint}
-              onChange={(e) => setOllamaEmbeddingEndpoint(e.target.value)}
-              placeholder={DEFAULT_OLLAMA_ENDPOINT}
-              className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
-            />
-          </div>
-
-          {/* Model */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-medium text-gunmetal">
-                Embedding Model
-                {loadingOllamaModels && (
-                  <span className="ml-2 text-xs text-silver-dark animate-pulse">
-                    Loading…
-                  </span>
-                )}
-                {!loadingOllamaModels && ollamaEmbedModels.length > 0 && (
-                  <span className="ml-2 text-xs text-silver-dark font-normal">
-                    ({ollamaEmbedModels.length} model{ollamaEmbedModels.length !== 1 ? "s" : ""})
-                  </span>
-                )}
+        {/* ── OpenRouter Embeddings ── */}
+        {embeddingProvider === "openrouter" && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
+            {/* API Key */}
+            <div>
+              <label className="block text-sm font-medium text-gunmetal mb-1">
+                OpenRouter API Key
               </label>
-              <button
-                onClick={fetchOllamaEmbedModels}
-                disabled={loadingOllamaModels}
-                className="text-xs text-sandy hover:text-sandy-dark cursor-pointer disabled:opacity-50"
-              >
-                Refresh
-              </button>
+              <input
+                type="password"
+                value={openrouterApiKey}
+                onChange={(e) => setOpenrouterApiKey(e.target.value)}
+                placeholder="sk-or-..."
+                className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+              />
+              {!openrouterApiKey && (
+                <StatusMessage type="warning" label="Note:" className="mt-1">
+                  An OpenRouter API key is required.
+                </StatusMessage>
+              )}
             </div>
 
-            {ollamaModelError && (
-              <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-700">
-                {ollamaModelError}
-              </div>
-            )}
-
-            {!loadingOllamaModels && ollamaEmbedModels.length === 0 && !ollamaModelError && (
-              <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-700">
-                No embedding models found. Pull one with e.g. <code>ollama pull embeddinggemma</code> or <code>ollama pull all-minilm</code>.
-                Models with &quot;embed&quot; or &quot;bge&quot; in their name are detected.
-              </div>
-            )}
-
-            <select
-              value={ollamaEmbeddingModel}
-              onChange={(e) => setOllamaEmbeddingModel(e.target.value)}
-              disabled={ollamaEmbedModels.length === 0}
-              className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none disabled:opacity-50"
-            >
-              {ollamaEmbedModels.length === 0 && (
-                <option value="">No embedding models available</option>
-              )}
-              {ollamaEmbedModels.map((m) => {
-                const dimsLabel = m.embeddingDimensions ? ` — ${m.embeddingDimensions}d` : "";
-                return (
-                  <option key={m.name} value={m.name}>
-                    {m.name}{m.parameterSize ? ` (${m.parameterSize})` : ""}{dimsLabel}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-        </>
-      )}
-
-      {/* ── vLLM Embeddings ── */}
-      {embeddingProvider === "vllm" && (
-        <>
-          {/* Endpoint */}
-          <div>
-            <label className="block text-sm font-medium text-gunmetal mb-1">
-              vLLM Embedding Endpoint
-            </label>
-            <input
-              type="text"
-              value={vllmEmbeddingEndpoint}
-              onChange={(e) => setVllmEmbeddingEndpoint(e.target.value)}
-              placeholder="http://localhost:8001"
-              className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
-            />
-          </div>
-
-          {/* Model */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-medium text-gunmetal">
+            {/* OR Embedding Model */}
+            <div>
+              <label className="block text-sm font-medium text-gunmetal mb-1">
                 Embedding Model
-                {loadingVllmModels && (
-                  <span className="ml-2 text-xs text-silver-dark animate-pulse">
-                    Loading…
-                  </span>
-                )}
+                <span className="ml-2 text-xs text-silver-dark font-normal">
+                  ({orEmbeddingModels.length} models)
+                </span>
               </label>
-              <div className="flex gap-2">
+              <select
+                value={openrouterEmbeddingModel}
+                onChange={(e) => setOpenrouterEmbeddingModel(e.target.value)}
+                className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none"
+              >
+                {orEmbeddingModels.map((m) => {
+                  const inPrice = formatPricing(m.pricing.prompt);
+                  const outPrice = formatPricing(m.pricing.completion);
+                  const ctx = formatCtx(m.context_length);
+                  const dims = m.dimensions;
+                  const dimsLabel = dims ? `${dims}d` : "";
+                  return (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.id}) — In: {inPrice} · Out: {outPrice}{dimsLabel ? ` · ${dimsLabel}` : ""} · {ctx} ctx
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* ── Voyage AI Embeddings ── */}
+        {embeddingProvider === "voyage" && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
+            {/* API Key */}
+            <div>
+              <label className="block text-sm font-medium text-gunmetal mb-1">
+                Voyage AI API Key
+              </label>
+              <input
+                type="password"
+                value={voyageApiKey}
+                onChange={(e) => setVoyageApiKey(e.target.value)}
+                placeholder="pa-..."
+                className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+              />
+            </div>
+
+            {/* Voyage Model */}
+            <div>
+              <label className="block text-sm font-medium text-gunmetal mb-1">
+                Embedding Model
+              </label>
+              <select
+                value={voyageModel}
+                onChange={(e) => setVoyageModel(e.target.value)}
+                className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none"
+              >
+                {VOYAGE_MODELS.map((m) => (
+                  <option key={m.key} value={m.key}>
+                    {m.label} — {m.description} ({m.dimensions}d)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* ── Cohere Embeddings ── */}
+        {embeddingProvider === "cohere" && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
+            {/* API Key */}
+            <div>
+              <label className="block text-sm font-medium text-gunmetal mb-1">
+                Cohere API Key
+              </label>
+              <input
+                type="password"
+                value={cohereApiKey}
+                onChange={(e) => setCohereApiKey(e.target.value)}
+                placeholder="your-api-key"
+                className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+              />
+            </div>
+
+            {/* Cohere Model */}
+            <div>
+              <label className="block text-sm font-medium text-gunmetal mb-1">
+                Embedding Model
+              </label>
+              <select
+                value={cohereModel}
+                onChange={(e) => setCohereModel(e.target.value)}
+                className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none"
+              >
+                {COHERE_MODELS.map((m) => (
+                  <option key={m.key} value={m.key}>
+                    {m.label} — {m.description} ({m.dimensions}d)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* ── Ollama Embeddings ── */}
+        {embeddingProvider === "ollama" && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
+            {/* Endpoint */}
+            <div>
+              <label className="block text-sm font-medium text-gunmetal mb-1">
+                Ollama Endpoint
+              </label>
+              <input
+                type="text"
+                value={ollamaEmbeddingEndpoint}
+                onChange={(e) => setOllamaEmbeddingEndpoint(e.target.value)}
+                placeholder={DEFAULT_OLLAMA_ENDPOINT}
+                className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+              />
+            </div>
+
+            {/* Model */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gunmetal">
+                  Embedding Model
+                  {loadingOllamaModels && (
+                    <span className="ml-2 text-xs text-silver-dark animate-pulse">
+                      Loading…
+                    </span>
+                  )}
+                  {!loadingOllamaModels && ollamaEmbedModels.length > 0 && (
+                    <span className="ml-2 text-xs text-silver-dark font-normal">
+                      ({ollamaEmbedModels.length} model{ollamaEmbedModels.length !== 1 ? "s" : ""})
+                    </span>
+                  )}
+                </label>
                 <button
-                  onClick={fetchVllmEmbedModels}
-                  disabled={loadingVllmModels}
+                  onClick={fetchOllamaEmbedModels}
+                  disabled={loadingOllamaModels}
                   className="text-xs text-sandy hover:text-sandy-dark cursor-pointer disabled:opacity-50"
                 >
                   Refresh
                 </button>
               </div>
-            </div>
 
-            {vllmModelError && (
-              <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-700">
-                {vllmModelError}
-              </div>
-            )}
-
-            {vllmEmbedModels.length > 0 ? (
-              <select
-                value={vllmEmbeddingModel}
-                onChange={(e) => setVllmEmbeddingModel(e.target.value)}
-                className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none"
-              >
-                {vllmEmbedModels.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.id} {m.max_model_len ? `(ctx: ${m.max_model_len})` : ""}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              !loadingVllmModels && !vllmModelError && (
-                <div className="rounded-lg bg-slate-50 border border-silver p-3 text-xs text-silver-dark italic">
-                  No models detected at this endpoint.
-                </div>
-              )
-            )}
-            
-            <div className="mt-2">
-              <button
-                onClick={() => setShowVllmExample(!showVllmExample)}
-                className="text-[10px] text-sandy hover:underline cursor-pointer"
-              >
-                {showVllmExample ? "Hide example command" : "Show example command"}
-              </button>
-              {showVllmExample && (
-                <div className="mt-1 p-2 bg-slate-900 rounded text-[10px] font-mono text-slate-300 break-all select-all">
-                  vllm serve {vllmEmbeddingModel || "jinaai/jina-embeddings-v3"} --port {vllmEmbeddingEndpoint ? new URL(vllmEmbeddingEndpoint).port : "8001"}
-                </div>
+              {ollamaModelError && (
+                <StatusMessage type="error" label="Error:" className="mb-2">
+                  {ollamaModelError}
+                </StatusMessage>
               )}
+
+              {!loadingOllamaModels && ollamaEmbedModels.length === 0 && !ollamaModelError && (
+                <StatusMessage type="warning" label="Note:" className="mb-2">
+                  No embedding models found. Pull one with e.g. <code>ollama pull embeddinggemma</code> or <code>ollama pull all-minilm</code>.
+                  Models with &quot;embed&quot; or &quot;bge&quot; in their name are detected.
+                </StatusMessage>
+              )}
+
+              <select
+                value={ollamaEmbeddingModel}
+                onChange={(e) => setOllamaEmbeddingModel(e.target.value)}
+                disabled={ollamaEmbedModels.length === 0}
+                className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none disabled:opacity-50"
+              >
+                {ollamaEmbedModels.length === 0 && (
+                  <option value="">No embedding models available</option>
+                )}
+                {ollamaEmbedModels.map((m) => {
+                  const dimsLabel = m.embeddingDimensions ? ` — ${m.embeddingDimensions}d` : "";
+                  return (
+                    <option key={m.name} value={m.name}>
+                      {m.name}{m.parameterSize ? ` (${m.parameterSize})` : ""}{dimsLabel}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
           </div>
-        </>
-      )}
+        )}
+
+        {/* ── vLLM Embeddings ── */}
+        {embeddingProvider === "vllm" && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
+            {/* Endpoint */}
+            <div>
+              <label className="block text-sm font-medium text-gunmetal mb-1">
+                vLLM Embedding Endpoint
+              </label>
+              <input
+                type="text"
+                value={vllmEmbeddingEndpoint}
+                onChange={(e) => setVllmEmbeddingEndpoint(e.target.value)}
+                placeholder="http://localhost:8001"
+                className="w-full rounded-lg border border-silver px-3 py-2 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+              />
+            </div>
+
+            {/* Model */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gunmetal">
+                  Embedding Model
+                  {loadingVllmModels && (
+                    <span className="ml-2 text-xs text-silver-dark animate-pulse">
+                      Loading…
+                    </span>
+                  )}
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={fetchVllmEmbedModels}
+                    disabled={loadingVllmModels}
+                    className="text-xs text-sandy hover:text-sandy-dark cursor-pointer disabled:opacity-50"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              {vllmModelError && (
+                <StatusMessage type="error" label="Error:" className="mb-2">
+                  {vllmModelError}
+                </StatusMessage>
+              )}
+
+              {vllmEmbedModels.length > 0 ? (
+                <select
+                  value={vllmEmbeddingModel}
+                  onChange={(e) => setVllmEmbeddingModel(e.target.value)}
+                  className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none"
+                >
+                  {vllmEmbedModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.id} {m.max_model_len ? `(ctx: ${m.max_model_len})` : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                !loadingVllmModels && !vllmModelError && (
+                  <StatusMessage type="warning" label="Note:">
+                    No models detected at this endpoint.
+                  </StatusMessage>
+                )
+              )}
+              
+              <div className="mt-2">
+                <button
+                  onClick={() => setShowVllmExample(!showVllmExample)}
+                  className="text-[10px] text-sandy hover:underline cursor-pointer"
+                >
+                  {showVllmExample ? "Hide example command" : "Show example command"}
+                </button>
+                {showVllmExample && (
+                  <div className="mt-1 p-2 bg-slate-900 rounded text-[10px] font-mono text-slate-300 break-all select-all">
+                    vllm serve {vllmEmbeddingModel || "jinaai/jina-embeddings-v3"} --port {vllmEmbeddingEndpoint ? new URL(vllmEmbeddingEndpoint).port : "8001"}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </ConfigContainer>
 
       {/* ── Shared Output Dimensions ── */}
       <div>
@@ -973,19 +944,19 @@ export default function EmbeddingsSection() {
 
       {/* Error */}
       {embeddingError && (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700">
+        <StatusMessage type="error" label="Error:">
           {embeddingError}
-        </div>
+        </StatusMessage>
       )}
 
       {/* Success + Downloads */}
       {embeddingsData && (
         <div className="space-y-3">
-          <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
+          <StatusMessage type="success" label="Success:">
             Generated {embeddingsData.length} embeddings (
             {embeddingsData[0]?.length ?? 0} dimensions each) using{" "}
             {embeddingProvider === "voyage" ? "Voyage AI" : embeddingProvider === "cohere" ? "Cohere" : embeddingProvider === "ollama" ? "Ollama" : embeddingProvider === "vllm" ? "vLLM" : "OpenRouter"}.
-          </div>
+          </StatusMessage>
 
           <ActionRow
             onDownload={handleDownloadEmbeddings}

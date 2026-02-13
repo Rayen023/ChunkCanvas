@@ -493,7 +493,7 @@ export default function Home() {
 
           <div className="grid gap-4 lg:grid-cols-[360px,1fr] lg:items-start">
             {/* Left: Params */}
-            <div className="rounded-xl border border-silver-light bg-card p-4">
+            <div className="rounded-xl bg-card">
               <ChunkingParams />
             </div>
 

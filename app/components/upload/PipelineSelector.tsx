@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useMemo, useEffect } from "react";
 import { PIPELINE, PIPELINE_ALLOWED_EXTENSIONS } from "@/app/lib/constants";
 import { useAppStore } from "@/app/lib/store";
@@ -8,38 +7,15 @@ import OpenRouterForm from "../pipeline-forms/OpenRouterForm";
 import OllamaForm from "../pipeline-forms/OllamaForm";
 import VllmForm from "../pipeline-forms/VllmForm";
 import ExcelForm from "../pipeline-forms/ExcelForm";
+import {
+  ProviderSelector,
+  ConfigContainer,
+  ConfigHeader,
+  ProviderOption,
+} from "@/app/components/shared/ConfigSection";
+import StatusMessage from "@/app/components/shared/StatusMessage";
 
 const ALL_PIPELINES = Object.values(PIPELINE);
-
-/** Short descriptions for each pipeline */
-const PIPELINE_DESCRIPTIONS: Record<string, string> = {
-  [PIPELINE.SIMPLE_TEXT]:
-    "Extracts text locally using built-in parsers (pdfjs, mammoth). No API key needed.",
-  [PIPELINE.EXCEL_SPREADSHEET]:
-    "Reads spreadsheet rows and columns client-side. No API key needed.",
-  [PIPELINE.CSV_SPREADSHEET]:
-    "Reads CSV rows client-side. No API key needed.",
-  [PIPELINE.OPENROUTER_PDF]:
-    "Sends each PDF page to a multimodal LLM via OpenRouter for high-quality extraction.",
-  [PIPELINE.OPENROUTER_IMAGE]:
-    "Describes or extracts text from images using a multimodal LLM via OpenRouter.",
-  [PIPELINE.OPENROUTER_AUDIO]:
-    "Transcribes audio files using a multimodal LLM via OpenRouter.",
-  [PIPELINE.OPENROUTER_VIDEO]:
-    "Summarises video content using a multimodal LLM via OpenRouter.",
-  [PIPELINE.OLLAMA_PDF]:
-    "Vision-based parsing using a local Ollama model (e.g. gemma3-v, llava).",
-  [PIPELINE.OLLAMA_IMAGE]:
-    "Vision-based image description using a local Ollama model.",
-  [PIPELINE.VLLM_PDF]:
-    "Vision-based parsing using a local vLLM instance (OpenAI-compatible).",
-  [PIPELINE.VLLM_IMAGE]:
-    "Vision-based image description using a local vLLM instance.",
-  [PIPELINE.VLLM_AUDIO]:
-    "Audio transcription using a local vLLM instance (OpenAI-compatible).",
-  [PIPELINE.VLLM_VIDEO]:
-    "Video understanding using a local vLLM instance (OpenAI-compatible).",
-};
 
 /** Whether a pipeline requires an API key */
 const PIPELINE_NEEDS_KEY: Record<string, boolean> = {
@@ -56,6 +32,90 @@ const PIPELINE_NEEDS_KEY: Record<string, boolean> = {
   [PIPELINE.VLLM_IMAGE]: false,
   [PIPELINE.VLLM_AUDIO]: false,
   [PIPELINE.VLLM_VIDEO]: false,
+};
+
+const PIPELINE_META: Record<string, Omit<ProviderOption, "id" | "label">> = {
+  [PIPELINE.SIMPLE_TEXT]: {
+    badge: "Local",
+    icon: "/tech-icons/pdf-mammoth.svg",
+    requiresApiKey: false,
+  },
+  [PIPELINE.EXCEL_SPREADSHEET]: {
+    badge: "Local",
+    icon: "/tech-icons/xlsx.svg",
+    requiresApiKey: false,
+  },
+  [PIPELINE.CSV_SPREADSHEET]: {
+    badge: "Local",
+    icon: "/tech-icons/csv.svg",
+    requiresApiKey: false,
+  },
+  [PIPELINE.OPENROUTER_PDF]: {
+    badge: "Cloud",
+    icon: "/tech-icons/openrouter.svg",
+    requiresApiKey: true,
+  },
+  [PIPELINE.OPENROUTER_IMAGE]: {
+    badge: "Cloud",
+    icon: "/tech-icons/openrouter.svg",
+    requiresApiKey: true,
+  },
+  [PIPELINE.OPENROUTER_AUDIO]: {
+    badge: "Cloud",
+    icon: "/tech-icons/openrouter.svg",
+    requiresApiKey: true,
+  },
+  [PIPELINE.OPENROUTER_VIDEO]: {
+    badge: "Cloud",
+    icon: "/tech-icons/openrouter.svg",
+    requiresApiKey: true,
+  },
+  [PIPELINE.OLLAMA_PDF]: {
+    badge: "Local",
+    icon: "/tech-icons/ollama.svg",
+    requiresApiKey: false,
+  },
+  [PIPELINE.OLLAMA_IMAGE]: {
+    badge: "Local",
+    icon: "/tech-icons/ollama.svg",
+    requiresApiKey: false,
+  },
+  [PIPELINE.VLLM_PDF]: {
+    badge: "Local",
+    icon: "/tech-icons/vllm-color.svg",
+    requiresApiKey: false,
+  },
+  [PIPELINE.VLLM_IMAGE]: {
+    badge: "Local",
+    icon: "/tech-icons/vllm-color.svg",
+    requiresApiKey: false,
+  },
+  [PIPELINE.VLLM_AUDIO]: {
+    badge: "Local",
+    icon: "/tech-icons/vllm-color.svg",
+    requiresApiKey: false,
+  },
+  [PIPELINE.VLLM_VIDEO]: {
+    badge: "Local",
+    icon: "/tech-icons/vllm-color.svg",
+    requiresApiKey: false,
+  },
+};
+
+const PIPELINE_LABELS: Record<string, string> = {
+  [PIPELINE.SIMPLE_TEXT]: "pdfjs + mammoth",
+  [PIPELINE.EXCEL_SPREADSHEET]: "XLSX",
+  [PIPELINE.CSV_SPREADSHEET]: "CSV Parser",
+  [PIPELINE.OPENROUTER_PDF]: "OpenRouter",
+  [PIPELINE.OPENROUTER_IMAGE]: "OpenRouter",
+  [PIPELINE.OPENROUTER_AUDIO]: "OpenRouter",
+  [PIPELINE.OPENROUTER_VIDEO]: "OpenRouter",
+  [PIPELINE.OLLAMA_PDF]: "Ollama",
+  [PIPELINE.OLLAMA_IMAGE]: "Ollama",
+  [PIPELINE.VLLM_PDF]: "vLLM",
+  [PIPELINE.VLLM_IMAGE]: "vLLM",
+  [PIPELINE.VLLM_AUDIO]: "vLLM",
+  [PIPELINE.VLLM_VIDEO]: "vLLM",
 };
 
 export default function PipelineSelector() {
@@ -125,6 +185,14 @@ export default function PipelineSelector() {
           const groupFiles = extGroups[ext];
           const pipelines = extPipelines[ext] ?? [];
           const selected = pipelinesByExt[ext] ?? "";
+          const pipelineOptions: ProviderOption[] = pipelines.map((pipelineId) => ({
+            id: pipelineId,
+            label: PIPELINE_LABELS[pipelineId] ?? pipelineId,
+            badge: PIPELINE_META[pipelineId]?.badge,
+            icon: PIPELINE_META[pipelineId]?.icon,
+            requiresApiKey: PIPELINE_NEEDS_KEY[pipelineId],
+          }));
+          const selectedOption = pipelineOptions.find((option) => option.id === selected);
 
           return (
             <div key={ext} className="space-y-2">
@@ -140,86 +208,33 @@ export default function PipelineSelector() {
               </div>
 
               {/* Pipeline options */}
-              <div className="space-y-1.5 ml-1">
-                {pipelines.map((name) => {
-                  const isSelected = selected === name;
-                  const needsKey = PIPELINE_NEEDS_KEY[name];
-                  const desc = PIPELINE_DESCRIPTIONS[name] ?? "";
-
-                  return (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => setPipelineForExt(ext, name)}
-                      className={`
-                        w-full text-left rounded-lg border px-3.5 py-2.5 transition-all duration-150 cursor-pointer
-                        ${
-                          isSelected
-                            ? "border-sandy bg-sandy/8 ring-2 ring-sandy/30"
-                            : "border-silver-light bg-card hover:border-sandy/50 hover:bg-sandy/4"
-                        }
-                      `}
-                    >
-                      <div className="flex items-center gap-2">
-                        {/* Radio circle */}
-                        <span
-                          className={`
-                            flex-shrink-0 h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors
-                            ${isSelected ? "border-sandy" : "border-silver"}
-                          `}
-                        >
-                          {isSelected && (
-                            <span className="h-2 w-2 rounded-full bg-sandy" />
-                          )}
-                        </span>
-
-                        <span
-                          className={`text-sm font-medium ${isSelected ? "text-gunmetal" : "text-gunmetal-light"} flex items-center gap-2`}
-                        >
-                          {name.startsWith("OpenRouter") && (
-                            <Image src="/tech-icons/openrouter.svg" alt="OpenRouter" width={16} height={16} className="h-4 w-4" />
-                          )}
-                          {name.startsWith("Ollama") && (
-                            <Image src="/tech-icons/ollama.svg" alt="Ollama" width={16} height={16} className="h-4 w-4" />
-                          )}
-                          {name.startsWith("vLLM") && (
-                            <Image src="/tech-icons/vllm-color.svg" alt="vLLM" width={16} height={16} className="h-4 w-4" />
-                          )}
-                          {(name === PIPELINE.SIMPLE_TEXT || name === PIPELINE.EXCEL_SPREADSHEET || name === PIPELINE.CSV_SPREADSHEET) && (
-                            <svg className="h-4 w-4 text-silver-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                          )}
-                          {name}
-                        </span>
-
-                        {needsKey && (
-                          <span className="ml-auto flex-shrink-0 rounded-md bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                            API Key
-                          </span>
-                        )}
-                      </div>
-
-                      {desc && (
-                        <p className="mt-1 ml-6 text-[11px] leading-relaxed text-silver-dark">
-                          {desc}
-                        </p>
-                      )}
-                    </button>
-                  );
-                })}
+              <div className="space-y-2 ml-1">
+                <ProviderSelector
+                  options={pipelineOptions}
+                  selectedId={selected}
+                  onSelect={(id) => setPipelineForExt(ext, id)}
+                />
 
                 {pipelines.length === 0 && (
-                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-700">
+                  <StatusMessage type="warning" label="Note:">
                     No compatible pipeline found for{" "}
                     <code className="font-mono">.{ext}</code> files.
-                  </div>
+                  </StatusMessage>
                 )}
               </div>
 
               {/* Per-extension config form — appears below selected pipeline */}
               {selected && selected !== PIPELINE.SIMPLE_TEXT && (
-                <div className="ml-1 p-4 bg-config-bg rounded-lg border border-config-border space-y-3">
+                <ConfigContainer className="ml-1" active>
+                  <ConfigHeader
+                    title={`${selectedOption?.label || "Pipeline"} Configuration`}
+                    icon={selectedOption?.icon}
+                    description={
+                      selectedOption?.badge === "Cloud"
+                        ? "Cloud provider selected. API key is required."
+                        : "Local provider selected."
+                    }
+                  />
                   {selected.startsWith("OpenRouter") && (
                     <OpenRouterForm ext={ext} />
                   )}
@@ -233,12 +248,16 @@ export default function PipelineSelector() {
                     selected === PIPELINE.CSV_SPREADSHEET) && (
                     <ExcelForm ext={ext} />
                   )}
-                </div>
+                </ConfigContainer>
               )}
               {selected === PIPELINE.SIMPLE_TEXT && (
-                <p className="ml-1 text-xs text-silver-dark italic">
-                  No configuration needed for Simple Text extraction.
-                </p>
+                <ConfigContainer className="ml-1" active>
+                  <ConfigHeader
+                    title={`${selectedOption?.label || "Pipeline"} Configuration`}
+                    icon={selectedOption?.icon}
+                    description="Local provider selected."
+                  />
+                </ConfigContainer>
               )}
 
               {/* Separator between groups */}

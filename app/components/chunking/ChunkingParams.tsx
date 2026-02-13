@@ -129,7 +129,11 @@ export default function ChunkingParams() {
     JSON.stringify(sep).slice(1, -1); // fallback: escaped string
 
   return (
-    <div className="space-y-3">
+    <div
+      className={`space-y-3 rounded-lg border p-3 ${
+        isModified ? "border-sandy" : "border-silver-light"
+      }`}
+    >
       {/* Strategy + Defaults */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">

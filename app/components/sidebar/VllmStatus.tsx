@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useAppStore } from "@/app/lib/store";
+import StatusMessage from "@/app/components/shared/StatusMessage";
 
 type EndpointStatus = {
   status: "idle" | "ok" | "error";
@@ -170,7 +171,7 @@ export default function VllmStatus() {
         vLLM Server Status
       </summary>
 
-      <div className="mt-3 space-y-2 p-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-silver-light/50">
+      <div className="mt-3 space-y-2 p-3 rounded-lg bg-config-bg border border-config-border">
         <label className="block text-xs text-gunmetal-light">
           vLLM endpoints
         </label>
@@ -182,7 +183,7 @@ export default function VllmStatus() {
             value={endpoint}
             onChange={(e) => setEndpoint(e.target.value)}
             placeholder="Primary endpoint (e.g. http://localhost:8000)"
-            className="flex-1 rounded-lg border border-silver px-3 py-1.5 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none min-w-0"
+            className="flex-1 rounded-lg border border-silver bg-card text-gunmetal px-3 py-1.5 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none min-w-0"
           />
           <button
             onClick={addEndpoint}
@@ -203,7 +204,7 @@ export default function VllmStatus() {
               value={ep}
               onChange={(e) => updateAdditionalEndpoint(i, e.target.value)}
               placeholder="Additional endpoint"
-              className="flex-1 rounded-lg border border-silver px-3 py-1.5 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none min-w-0"
+              className="flex-1 rounded-lg border border-silver bg-card text-gunmetal px-3 py-1.5 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none min-w-0"
             />
             <button
               onClick={() => removeEndpoint(i)}
@@ -245,37 +246,40 @@ export default function VllmStatus() {
              const st = statuses[url];
              if (!st || st.status === "idle") return null;
 
-             return (
-               <div key={`${url}-${idx}`} className={`rounded-lg p-2 text-xs border ${st.status === "ok" ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
-                 <div className="font-bold mb-1 break-all">{url}</div>
-                 {st.status === "ok" ? (
-                   <>
-                     <div className="flex items-center gap-1 mb-1">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span className="font-semibold">Healthy</span>
-                     </div>
-                     {st.models.length > 0 && (
-                       <ul className="ml-4 list-disc opacity-90">
-                         {st.models.map((m) => (
-                           <li key={m.id}>
-                             {m.id} {m.max_model_len ? `(ctx: ${m.max_model_len})` : ""}
-                           </li>
-                         ))}
-                       </ul>
-                     )}
-                   </>
-                 ) : (
+             if (st.status === "ok") {
+               return (
+                 <StatusMessage key={`${url}-${idx}`} type="success" label="Success:" className="break-all">
+                   <div className="font-bold mb-1">{url}</div>
+                   <div className="flex items-center gap-1 mb-1">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="font-semibold">Healthy</span>
+                   </div>
+                   {st.models.length > 0 && (
+                     <ul className="ml-4 list-disc opacity-90">
+                       {st.models.map((m) => (
+                         <li key={m.id}>
+                           {m.id} {m.max_model_len ? `(ctx: ${m.max_model_len})` : ""}
+                         </li>
+                       ))}
+                     </ul>
+                   )}
+                 </StatusMessage>
+               );
+             } else {
+               return (
+                 <StatusMessage key={`${url}-${idx}`} type="error" label="Error:" className="break-all">
+                   <div className="font-bold mb-1">{url}</div>
                    <div className="flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                       <span>Not reachable</span>
                    </div>
-                 )}
-               </div>
-             );
+                 </StatusMessage>
+               );
+             }
           })}
         </div>
 

@@ -5,6 +5,7 @@ import { useAppStore } from "@/app/lib/store";
 import { DEFAULT_VLLM_ENDPOINT, DEFAULT_PROMPTS } from "@/app/lib/constants";
 import { PIPELINE_MODALITY } from "@/app/lib/types";
 import type { Modality } from "@/app/lib/types";
+import StatusMessage from "@/app/components/shared/StatusMessage";
 
 export default function VllmForm({ ext }: { ext: string }) {
   const pipelinesByExt = useAppStore((s) => s.pipelinesByExt);
@@ -128,9 +129,9 @@ export default function VllmForm({ ext }: { ext: string }) {
         </div>
 
         {modelError && (
-          <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-700">
+          <StatusMessage type="error" label="Error:" className="mb-2">
             {modelError}
-          </div>
+          </StatusMessage>
         )}
 
         {availableModels.length > 0 ? (
@@ -147,9 +148,9 @@ export default function VllmForm({ ext }: { ext: string }) {
           </select>
         ) : (
           !loadingModels && !modelError && (
-            <div className="rounded-lg bg-slate-50 border border-silver p-3 text-xs text-silver-dark italic">
+            <StatusMessage type="warning" label="Note:">
               No models detected at this endpoint.
-            </div>
+            </StatusMessage>
           )
         )}
       </div>

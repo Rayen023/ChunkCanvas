@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useAppStore } from "@/app/lib/store";
+import StatusMessage from "@/app/components/shared/StatusMessage";
 
 export default function OllamaStatus() {
   const endpoint = useAppStore((s) => s.ollamaEndpoint);
@@ -86,7 +87,7 @@ export default function OllamaStatus() {
         Ollama Server Status
       </summary>
 
-      <div className="mt-3 space-y-2 p-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-silver-light/50">
+      <div className="mt-3 space-y-2 p-3 rounded-lg bg-config-bg border border-config-border">
         <label className="block text-xs text-gunmetal-light">
           Ollama endpoint
         </label>
@@ -94,7 +95,7 @@ export default function OllamaStatus() {
           type="text"
           value={endpoint}
           onChange={(e) => setEndpoint(e.target.value)}
-          className="w-full rounded-lg border border-silver px-3 py-1.5 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+          className="w-full rounded-lg border border-silver bg-card text-gunmetal px-3 py-1.5 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
         />
         <button
           onClick={check}
@@ -105,8 +106,8 @@ export default function OllamaStatus() {
         </button>
 
         {status === "ok" && (
-          <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2 text-xs text-emerald-700">
-            <span className="font-semibold">&#x2714; Ollama server is running</span>
+          <StatusMessage type="success" label="Success:">
+            Ollama server is running
             {models.length > 0 && (
               <ul className="mt-1 ml-4 list-disc">
                 {models.map((m) => (
@@ -114,13 +115,13 @@ export default function OllamaStatus() {
                 ))}
               </ul>
             )}
-          </div>
+          </StatusMessage>
         )}
 
         {status === "error" && (
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-700">
+          <StatusMessage type="error" label="Error:">
             Ollama server not reachable at <code>{endpoint}</code>
-          </div>
+          </StatusMessage>
         )}
       </div>
     </details>

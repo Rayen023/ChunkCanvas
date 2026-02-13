@@ -5,6 +5,7 @@ import { useAppStore } from "@/app/lib/store";
 import { DEFAULT_OLLAMA_ENDPOINT, DEFAULT_PROMPTS } from "@/app/lib/constants";
 import { PIPELINE_MODALITY } from "@/app/lib/types";
 import type { Modality } from "@/app/lib/types";
+import StatusMessage from "@/app/components/shared/StatusMessage";
 
 interface OllamaModelInfo {
   name: string;
@@ -132,16 +133,16 @@ export default function OllamaForm({ ext }: { ext: string }) {
         </div>
 
         {modelError && (
-          <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-700">
+          <StatusMessage type="error" label="Error:" className="mb-2">
             {modelError}
-          </div>
+          </StatusMessage>
         )}
 
         {!loadingModels && visionModels.length === 0 && !modelError && (
-          <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-700">
+          <StatusMessage type="warning" label="Note:" className="mb-2">
             No vision-capable models found. Make sure Ollama is running and you have a vision model pulled
             (e.g. <code>ollama pull gemma3</code> or <code>ollama pull llava</code>).
-          </div>
+          </StatusMessage>
         )}
 
         <select

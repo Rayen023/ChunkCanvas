@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useAppStore } from "@/app/lib/store";
+import StatusMessage from "@/app/components/shared/StatusMessage";
 
 export default function ChromaStatus() {
   const localUrl = useAppStore((s) => s.chromaLocalUrl);
@@ -62,14 +63,14 @@ export default function ChromaStatus() {
         Chroma Server Status
       </summary>
 
-      <div className="mt-3 space-y-2 p-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-silver-light/50">
+      <div className="mt-3 space-y-2 p-3 rounded-lg bg-config-bg border border-config-border">
         <label className="block text-xs text-gunmetal-light">Chroma URL</label>
         <input
           type="text"
           value={localUrl}
           onChange={(e) => setLocalUrl(e.target.value)}
           placeholder="http://localhost:8000"
-          className="w-full rounded-lg border border-silver px-3 py-1.5 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
+          className="w-full rounded-lg border border-silver bg-card text-gunmetal px-3 py-1.5 text-sm focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none"
         />
 
         <button
@@ -81,15 +82,15 @@ export default function ChromaStatus() {
         </button>
 
         {status === "ok" && (
-          <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2 text-xs text-emerald-700">
+          <StatusMessage type="success" label="Success:">
             <span className="font-semibold">&#x2714; {message}</span>
-          </div>
+          </StatusMessage>
         )}
 
         {status === "error" && (
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-700">
+          <StatusMessage type="error" label="Error:">
             {message || "Chroma is not reachable"}
-          </div>
+          </StatusMessage>
         )}
 
         <div className="mt-1">
