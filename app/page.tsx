@@ -69,6 +69,7 @@ export default function Home() {
       vllmPrompt: cfg.vllmPrompt,
       excelSheet: cfg.excelSheet,
       excelColumn: cfg.excelColumn,
+      excelSelectedColumns: cfg.excelSelectedColumns,
     };
     // Stable stringify (keys are fixed, so JSON.stringify is stable enough here)
     return `v1|${fileFingerprint}|p:${filePipeline}|cfg:${JSON.stringify(relevantCfg)}`;
@@ -122,7 +123,9 @@ export default function Home() {
       const currentFile = state.files[fileIdx];
       const fileExt = currentFile.name.split(".").pop()?.toLowerCase() ?? "";
       const filePipeline = state.pipelinesByExt[fileExt] || state.pipeline;
-      const cfg = state.configByExt[fileExt] ?? defaultExtConfig();
+      const extCfg = state.configByExt[fileExt] ?? defaultExtConfig();
+      const fileCfg = state.configByFile[currentFile.name] ?? {};
+      const cfg = { ...extCfg, ...fileCfg };
 
       const cacheKey = buildParseCacheKey(currentFile, filePipeline, cfg);
       const cached = nextParseCache[cacheKey];
@@ -171,6 +174,7 @@ export default function Home() {
           vllmModel: cfg.vllmModel,
           vllmPrompt: cfg.vllmPrompt,
           excelColumn: cfg.excelColumn,
+          excelSelectedColumns: cfg.excelSelectedColumns,
           excelSheet: cfg.excelSheet,
           onProgress: (pct, msg) => {
             const adjusted = baseProgress + (pct / 100) * fileProgressRange;
@@ -301,43 +305,43 @@ export default function Home() {
   const embeddingsData = useAppStore((s) => s.embeddingsData);
 
   useEffect(() => {
-    // Only activate scroll detection if we have content
-    if (!parsedContent) {
-      setScrollActiveStep(null);
-      return;
-    }
+    const stepIds = ["step-1", "step-2", "step-3", "step-4", "step-5", "step-6"];
 
-    const stepIds = ["step-3", "step-4", "step-5", "step-6"];
-    const elements = stepIds.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
+    const updateActiveStep = () => {
+      const vh = window.innerHeight;
+      // Focus zone: top 15% to 55% of the viewport (upper-middle area)
+      const zoneTop = vh * 0.1;
+      const zoneBottom = vh * 0.4;
+      let bestStep: number | null = null;
+      let bestHeight = 0;
 
-    if (elements.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // We want to find the visible step that is "most" on screen or highest up
-        // Simple logic: find the one with highest intersection ratio
-        let bestStep: number | null = null;
-        let bestRatio = 0;
-
-        for (const entry of entries) {
-          const id = entry.target.id;
-          const stepNum = parseInt(id.replace("step-", ""), 10);
-          if (entry.isIntersecting && entry.intersectionRatio > bestRatio) {
-            bestRatio = entry.intersectionRatio;
-            bestStep = stepNum;
-          }
+      for (const id of stepIds) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        const visibleHeight = Math.max(
+          0,
+          Math.min(zoneBottom, rect.bottom) - Math.max(zoneTop, rect.top),
+        );
+        if (visibleHeight > bestHeight) {
+          bestHeight = visibleHeight;
+          bestStep = parseInt(id.replace("step-", ""), 10);
         }
-        
-        if (bestStep !== null) {
-          setScrollActiveStep(bestStep);
-        }
-      },
-      { threshold: [0, 0.25, 0.5, 0.75, 1] },
-    );
+      }
 
-    elements.forEach((el) => observer.observe(el));
+      if (bestStep !== null) {
+        setScrollActiveStep(bestStep);
+      }
+    };
 
-    return () => observer.disconnect();
+    window.addEventListener("scroll", updateActiveStep, { passive: true });
+    window.addEventListener("resize", updateActiveStep, { passive: true });
+    updateActiveStep();
+
+    return () => {
+      window.removeEventListener("scroll", updateActiveStep);
+      window.removeEventListener("resize", updateActiveStep);
+    };
   }, [parsedContent, editedChunks.length, embeddingsData, setScrollActiveStep]);
 
   // ── Live Chunking ──────────────────────────────────────────
@@ -380,6 +384,18 @@ export default function Home() {
   const canProcess =
     files.length > 0 && allExtsCovered && !isParsing && (needsOpenRouter ? !!openrouterApiKey : true);
 
+  // ── Determine unparsed vs cached files ──────────────────
+  const parsedFileNames = useMemo(
+    () => new Set(parsedResults.map((r) => r.filename)),
+    [parsedResults],
+  );
+  const unparsedFiles = useMemo(
+    () => files.filter((f) => !parsedFileNames.has(f.name)),
+    [files, parsedFileNames],
+  );
+  const cachedCount = files.length - unparsedFiles.length;
+  const hasNewUnparsed = unparsedFiles.length > 0 && parsedResults.length > 0;
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-8 space-y-8">
       {/* ── Mobile Header ──────────────────────────────── */}
@@ -411,6 +427,28 @@ export default function Home() {
             Select Pipeline, Configure &amp; Parse
           </h2>
           <PipelineSelector />
+
+          {/* Banner: new files added after a previous parse */}
+          {hasNewUnparsed && !isParsing && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-sandy/40 bg-sandy/5 px-3.5 py-2.5 text-sm">
+              <svg className="h-5 w-5 flex-shrink-0 mt-0.5 text-sandy" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+              </svg>
+              <div className="space-y-0.5">
+                <p className="font-medium text-gunmetal">
+                  {unparsedFiles.length} new file{unparsedFiles.length !== 1 ? "s" : ""} added
+                </p>
+                <p className="text-xs text-silver-dark">
+                  Click <span className="font-semibold text-sandy">Parse</span> below to process{" "}
+                  {unparsedFiles.length === 1 ? "it" : "them"}.
+                  {cachedCount > 0 && (
+                    <> Your {cachedCount} previously parsed file{cachedCount !== 1 ? "s" : ""} will be kept from cache — only the new ones are processed.</>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
+
           {isParsing && (
             <ProgressBar progress={parseProgress} message={parseProgressMsg} timer={formatTime(parsingTimer)} />
           )}
@@ -440,9 +478,25 @@ export default function Home() {
             <button
               onClick={handleProcess}
               disabled={!canProcess}
-              className="w-full flex items-center justify-center gap-2 rounded-lg bg-sandy px-4 py-3 text-sm font-medium text-white hover:bg-sandy-light active:bg-sandy-dark disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              className={`w-full flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                hasNewUnparsed
+                  ? "bg-sandy ring-2 ring-sandy/30 hover:bg-sandy-light active:bg-sandy-dark"
+                  : "bg-sandy hover:bg-sandy-light active:bg-sandy-dark"
+              }`}
             >
-              Parse Document{files.length > 1 ? "s" : ""}
+              {hasNewUnparsed ? (
+                <>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                  Parse {unparsedFiles.length} New File{unparsedFiles.length !== 1 ? "s" : ""}
+                  {cachedCount > 0 && (
+                    <span className="text-white/70 font-normal">({cachedCount} cached)</span>
+                  )}
+                </>
+              ) : (
+                <>Parse Document{files.length > 1 ? "s" : ""}</>
+              )}
             </button>
           )}
         </section>

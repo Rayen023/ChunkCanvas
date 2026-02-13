@@ -29,6 +29,7 @@ export interface AppState {
   pipeline: string;
   pipelinesByExt: Record<string, string>;
   configByExt: Record<string, ExtPipelineConfig>;
+  configByFile: Record<string, ExtPipelineConfig>;
 
   // ── Step 2 — pipeline form data ───────────────
   openrouterApiKey: string;
@@ -39,6 +40,7 @@ export interface AppState {
   excelSheet: string;
   excelSheets: string[];
   excelColumn: string;
+  excelSelectedColumns: string[];
   excelColumns: string[];
 
   // Ollama parsing
@@ -158,6 +160,7 @@ export interface AppActions {
   setPipeline: (pipeline: string) => void;
   setPipelineForExt: (ext: string, pipeline: string) => void;
   setConfigForExt: (ext: string, config: Partial<ExtPipelineConfig>) => void;
+  setConfigForFile: (filename: string, config: Partial<ExtPipelineConfig>) => void;
 
   // Step 2
   setOpenrouterApiKey: (key: string) => void;
@@ -168,6 +171,7 @@ export interface AppActions {
   setExcelSheet: (sheet: string) => void;
   setExcelSheets: (sheets: string[]) => void;
   setExcelColumn: (col: string) => void;
+  setExcelSelectedColumns: (cols: string[]) => void;
   setExcelColumns: (cols: string[]) => void;
 
   // Ollama parsing
@@ -286,6 +290,7 @@ export function defaultExtConfig(): ExtPipelineConfig {
     excelSheet: "",
     excelSheets: [],
     excelColumn: "",
+    excelSelectedColumns: [],
     excelColumns: [],
   };
 }
@@ -298,6 +303,7 @@ export const useAppStore = create<AppState & AppActions>()(
   pipeline: "",
   pipelinesByExt: {},
   configByExt: {},
+  configByFile: {},
   openrouterApiKey: "",
   openrouterModel: "google/gemini-3-flash-preview",
   openrouterPrompt: "",
@@ -306,6 +312,7 @@ export const useAppStore = create<AppState & AppActions>()(
   excelSheet: "",
   excelSheets: [],
   excelColumn: "",
+  excelSelectedColumns: [],
   excelColumns: [],
 
   // Ollama parsing
@@ -408,7 +415,7 @@ export const useAppStore = create<AppState & AppActions>()(
     const vals = Object.values(newPipelinesByExt).filter(Boolean);
     // Special case: clearing all files should clear transient session data.
     if (files.length === 0) {
-      set({ files: [], pipeline: "", pipelinesByExt: {}, configByExt: {} });
+      set({ files: [], pipeline: "", pipelinesByExt: {}, configByExt: {}, configByFile: {} });
       set({
         parsedContent: null,
         parsedFilename: "",
@@ -510,6 +517,11 @@ export const useAppStore = create<AppState & AppActions>()(
 
     // Also remove any active parsed results for this file; keep cache entries for other files.
     const removedName = removed?.name;
+    const nextConfigByFile = { ...s.configByFile };
+    if (removedName) {
+      delete nextConfigByFile[removedName];
+    }
+
     const nextParsedResults = removedName
       ? s.parsedResults.filter((r) => r.filename !== removedName)
       : s.parsedResults;
@@ -584,6 +596,7 @@ export const useAppStore = create<AppState & AppActions>()(
       pipelinesByExt: nextPipelines,
       pipeline: vals[0] || "",
       configByExt: nextConfig,
+      configByFile: nextConfigByFile,
       parsedResults: nextParsedResults,
       parsedContent: combinedContent,
       parsedFilename: nextParsedFilename,
@@ -640,6 +653,20 @@ export const useAppStore = create<AppState & AppActions>()(
       };
     });
   },
+  setConfigForFile: (filename, config) => {
+    set((s) => {
+      // Start with extension config as base if file config doesn't exist
+      const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+      const base = s.configByFile[filename] ?? s.configByExt[ext] ?? defaultExtConfig();
+      const updated = { ...base, ...config };
+      return {
+        configByFile: {
+          ...s.configByFile,
+          [filename]: updated,
+        },
+      };
+    });
+  },
 
   setOpenrouterApiKey: (key) => set({ openrouterApiKey: key }),
   setOpenrouterModel: (model) => set({ openrouterModel: model }),
@@ -649,6 +676,7 @@ export const useAppStore = create<AppState & AppActions>()(
   setExcelSheet: (sheet) => set({ excelSheet: sheet }),
   setExcelSheets: (sheets) => set({ excelSheets: sheets }),
   setExcelColumn: (col) => set({ excelColumn: col }),
+  setExcelSelectedColumns: (cols) => set({ excelSelectedColumns: cols }),
   setExcelColumns: (cols) => set({ excelColumns: cols }),
 
   setOllamaEndpoint: (ep) => set({ ollamaEndpoint: ep }),
@@ -811,6 +839,7 @@ export const useAppStore = create<AppState & AppActions>()(
       pipeline: "",
       pipelinesByExt: {},
       configByExt: {},
+      configByFile: {},
       openrouterApiKey: s.envKeys.openrouter || s.openrouterApiKey || "",
       openrouterModel: s.openrouterModel || "google/gemini-3-flash-preview",
       openrouterPrompt: "",
@@ -818,6 +847,7 @@ export const useAppStore = create<AppState & AppActions>()(
       excelSheet: "",
       excelSheets: [],
       excelColumn: "",
+      excelSelectedColumns: [],
       excelColumns: [],
       ollamaEndpoint: s.ollamaEndpoint || DEFAULT_OLLAMA_ENDPOINT,
       ollamaModel: s.ollamaModel || "",
@@ -894,6 +924,7 @@ export const useAppStore = create<AppState & AppActions>()(
       resets.pipeline = "";
       resets.pipelinesByExt = {};
       resets.configByExt = {};
+      resets.configByFile = {};
     }
     if (fromStep <= 2) {
       resets.parsedContent = null;

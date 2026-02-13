@@ -93,7 +93,9 @@ export default function ParsedDocumentView() {
       // then override scrollTop in the next frame so our position wins.
       el.focus();
       el.setSelectionRange(section.charOffset, section.charOffset);
-      const scrollPos = Math.max(0, targetY - 16);
+      // Jump so the line above the separator is visible at the top
+      const lineHeight = parseFloat(cs.lineHeight) || 21;
+      const scrollPos = Math.max(0, targetY - lineHeight * 2);
       el.scrollTop = scrollPos;
       requestAnimationFrame(() => {
         el.scrollTop = scrollPos;
@@ -275,28 +277,9 @@ export default function ParsedDocumentView() {
 
       {/* ── File navigation tabs (multi-file only) ─────────── */}
       {fileSections.length > 1 && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "6px",
-            paddingBottom: "4px",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "12px",
-              fontWeight: 500,
-              color: "var(--silver-dark)",
-              whiteSpace: "nowrap",
-              marginRight: "4px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "3px",
-            }}
-          >
-            <svg style={{ height: "14px", width: "14px" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="flex flex-wrap items-center gap-1.5 pb-1">
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-silver-dark whitespace-nowrap mr-1">
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
             </svg>
             Jump to:
@@ -308,31 +291,11 @@ export default function ParsedDocumentView() {
                 key={`${sec.name}-${i}`}
                 type="button"
                 onClick={() => scrollToFile(sec.name)}
-                style={{
-                  whiteSpace: "nowrap",
-                  borderRadius: "6px",
-                  padding: "4px 10px",
-                  fontSize: "12px",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  border: isActive ? "1.5px solid #F2A365" : "1.5px solid var(--silver-dark)",
-                  backgroundColor: isActive ? "#F2A365" : "var(--card)",
-                  color: isActive ? "#ffffff" : "var(--gunmetal)",
-                  boxShadow: isActive ? "0 1px 3px rgba(242,163,101,0.3)" : "none",
-                  transition: "all 0.15s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.borderColor = "#F2A365";
-                    e.currentTarget.style.color = "#F2A365";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.borderColor = "var(--silver-dark)";
-                    e.currentTarget.style.color = "var(--gunmetal)";
-                  }
-                }}
+                className={`whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-medium cursor-pointer border transition-colors duration-200 ${
+                  isActive
+                    ? "border-sandy bg-sandy text-white shadow-sm"
+                    : "border-silver bg-white dark:bg-gunmetal/10 text-gunmetal hover:border-sandy hover:text-sandy"
+                }`}
               >
                 {sec.name}
               </button>

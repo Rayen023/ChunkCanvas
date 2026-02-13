@@ -87,7 +87,7 @@ export async function getExcelColumns(file: File, sheetName?: string): Promise<s
 
 export async function parseExcel(
   file: File,
-  columnName: string,
+  selectedColumns: string[],
   sheetName?: string,
 ): Promise<{ text: string; rows: string[] }> {
   const ExcelJS = await import("exceljs");
@@ -101,9 +101,12 @@ export async function parseExcel(
     
   if (!sheet) throw new Error(`Sheet "${sheetName}" not found`);
 
-  // Find column index
+  // Find column indices
   const firstRow = sheet.getRow(1);
-  let colIndex = -1;
+  const colIndices: number[] = [];
+  
+  // Create a map of column name -> index
+  const colMap = new Map<string, number>();
   firstRow.eachCell((cell, colNumber) => {
     let val = "";
     const value = cell.value;
@@ -117,30 +120,45 @@ export async function parseExcel(
     } else {
       val = String(value ?? "");
     }
-
-    if (val === columnName) {
-      colIndex = colNumber;
-    }
+    colMap.set(val, colNumber);
   });
 
-  if (colIndex === -1) throw new Error(`Column "${columnName}" not found`);
+  for (const colName of selectedColumns) {
+    const idx = colMap.get(colName);
+    if (idx !== undefined) {
+      colIndices.push(idx);
+    }
+  }
+
+  if (colIndices.length === 0) throw new Error(`No columns found from selection`);
 
   const rows: string[] = [];
+  
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return; // Skip header
-    const cell = row.getCell(colIndex);
-    const value = cell.value;
-    if (value !== null && value !== undefined) {
-      if (typeof value === "object") {
-        if ("result" in value) rows.push(String(value.result ?? ""));
-        else if ("richText" in value && Array.isArray(value.richText)) {
-          rows.push(value.richText.map((rt: { text?: string }) => rt.text ?? "").join(""));
+    
+    // For each row, collect values from selected columns in order
+    for (const colIndex of colIndices) {
+        const cell = row.getCell(colIndex);
+        const value = cell.value;
+        let cellText = "";
+        
+        if (value !== null && value !== undefined) {
+          if (typeof value === "object") {
+            if ("result" in value) cellText = String(value.result ?? "");
+            else if ("richText" in value && Array.isArray(value.richText)) {
+              cellText = value.richText.map((rt: { text?: string }) => rt.text ?? "").join("");
+            }
+            else if ("text" in value) cellText = String(value.text);
+            else cellText = String(value);
+          } else {
+            cellText = String(value);
+          }
         }
-        else if ("text" in value) rows.push(String(value.text));
-        else rows.push(String(value));
-      } else {
-        rows.push(String(value));
-      }
+        
+        if (cellText.trim().length > 0) {
+            rows.push(cellText);
+        }
     }
   });
 
@@ -169,6 +187,7 @@ export interface ParseOptions {
   vllmPrompt?: string;
   // Excel-specific
   excelColumn?: string;
+  excelSelectedColumns?: string[];
   excelSheet?: string;
   // Progress, cancellation & streaming
   onProgress?: ProgressCallback;
@@ -198,8 +217,13 @@ export async function parseDocument(opts: ParseOptions): Promise<ParseResult> {
     // ── Excel & CSV ──────────────────────────────────────────────
     case PIPELINE.EXCEL_SPREADSHEET:
     case PIPELINE.CSV_SPREADSHEET: {
-      if (!opts.excelColumn) throw new Error("Column must be specified");
-      const { text, rows } = await parseExcel(opts.file, opts.excelColumn, opts.excelSheet);
+      const cols = opts.excelSelectedColumns && opts.excelSelectedColumns.length > 0 
+        ? opts.excelSelectedColumns 
+        : (opts.excelColumn ? [opts.excelColumn] : []);
+        
+      if (cols.length === 0) throw new Error("At least one column must be selected");
+      
+      const { text, rows } = await parseExcel(opts.file, cols, opts.excelSheet);
       return { content: text, excelRows: rows };
     }
 

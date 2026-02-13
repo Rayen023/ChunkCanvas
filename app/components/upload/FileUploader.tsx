@@ -27,7 +27,6 @@ export default function FileUploader() {
   const files = useAppStore((s) => s.files);
   const setFiles = useAppStore((s) => s.setFiles);
   const addFiles = useAppStore((s) => s.addFiles);
-  const removeFile = useAppStore((s) => s.removeFile);
   const inputRef = useRef<HTMLInputElement>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -75,6 +74,11 @@ export default function FileUploader() {
       } else {
         addFiles(deduped);
       }
+
+      // Scroll to Step 2 so the sidebar highlights "Configure & Parse"
+      requestAnimationFrame(() => {
+        document.getElementById("step-2")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
 
       // Reset file input values so re-uploading the same file works
       if (inputRef.current) inputRef.current.value = "";
@@ -224,7 +228,7 @@ export default function FileUploader() {
                 Drop file(s) or folder here, or click to browse
               </p>
               <p className="text-xs text-silver-dark mt-1">
-                PDF, DOCX, TXT, MD, XLSX, images, audio, video
+                PDF, Images, Audio, Video, XLSX, DOCX, CSV... 
               </p>
               <p className="text-xs text-silver-dark mt-0.5">
                 Mixed file types supported — each type gets its own pipeline
@@ -248,73 +252,6 @@ export default function FileUploader() {
         </button>
       )}
 
-      {/* File list */}
-      {files.length > 0 && (
-        <div className="space-y-1.5">
-          {files.map((f, i) => (
-            <div
-              key={`${f.name}-${i}`}
-              className="flex items-center justify-between rounded-lg border border-silver-light bg-card px-3 py-2 text-sm"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <svg
-                  className="h-4 w-4 text-sandy flex-shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
-                  />
-                </svg>
-                <span className="truncate text-gunmetal font-medium">
-                  {f.name}
-                </span>
-                <span className="text-xs text-silver-dark flex-shrink-0">
-                  {(f.size / 1024).toFixed(1)} KB
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeFile(i);
-                }}
-                className="ml-2 flex-shrink-0 rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
-                title="Remove file"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-          ))}
-
-          {/* Clear all */}
-          {files.length > 1 && (
-            <button
-              type="button"
-              onClick={() => setFiles([])}
-              className="text-xs text-red-500 hover:text-red-700 transition-colors cursor-pointer"
-            >
-              Clear all files
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }

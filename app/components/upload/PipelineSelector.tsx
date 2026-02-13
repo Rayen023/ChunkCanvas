@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { PIPELINE, PIPELINE_ALLOWED_EXTENSIONS } from "@/app/lib/constants";
 import { useAppStore } from "@/app/lib/store";
 import OpenRouterForm from "../pipeline-forms/OpenRouterForm";
@@ -120,6 +120,8 @@ const PIPELINE_LABELS: Record<string, string> = {
 
 export default function PipelineSelector() {
   const files = useAppStore((s) => s.files);
+  const setFiles = useAppStore((s) => s.setFiles);
+  const removeFile = useAppStore((s) => s.removeFile);
   const pipelinesByExt = useAppStore((s) => s.pipelinesByExt);
   const setPipelineForExt = useAppStore((s) => s.setPipelineForExt);
   const lastPipelineByExt = useAppStore((s) => s.lastPipelineByExt);
@@ -147,8 +149,23 @@ export default function PipelineSelector() {
   }, [extGroups]);
 
   const extKeys = Object.keys(extGroups);
-  const multiGroup = extKeys.length > 1;
 
+  // Track which file lists are expanded (for groups with many files)
+  const [expandedExts, setExpandedExts] = useState<Set<string>>(new Set());
+  const toggleExpand = (ext: string) =>
+    setExpandedExts((prev) => {
+      const next = new Set(prev);
+      next.has(ext) ? next.delete(ext) : next.add(ext);
+      return next;
+    });
+
+  /** Pipelines that have a real configuration form */
+  const HAS_CONFIG: Set<string> = new Set([
+    PIPELINE.OPENROUTER_PDF, PIPELINE.OPENROUTER_IMAGE, PIPELINE.OPENROUTER_AUDIO, PIPELINE.OPENROUTER_VIDEO,
+    PIPELINE.OLLAMA_PDF, PIPELINE.OLLAMA_IMAGE,
+    PIPELINE.VLLM_PDF, PIPELINE.VLLM_IMAGE, PIPELINE.VLLM_AUDIO, PIPELINE.VLLM_VIDEO,
+    PIPELINE.EXCEL_SPREADSHEET, PIPELINE.CSV_SPREADSHEET,
+  ]);
 
   // Auto-select: single compatible pipeline, or restore last-used if compatible
   useEffect(() => {
@@ -177,38 +194,131 @@ export default function PipelineSelector() {
     }
   }, [extPipelines, pipelinesByExt, setPipelineForExt]);
 
-  return (
-    <div className="space-y-5">
-      {/* Per-extension groups */}
-      <div className="space-y-5">
-        {extKeys.map((ext) => {
-          const groupFiles = extGroups[ext];
-          const pipelines = extPipelines[ext] ?? [];
-          const selected = pipelinesByExt[ext] ?? "";
-          const pipelineOptions: ProviderOption[] = pipelines.map((pipelineId) => ({
-            id: pipelineId,
-            label: PIPELINE_LABELS[pipelineId] ?? pipelineId,
-            badge: PIPELINE_META[pipelineId]?.badge,
-            icon: PIPELINE_META[pipelineId]?.icon,
-            requiresApiKey: PIPELINE_NEEDS_KEY[pipelineId],
-          }));
-          const selectedOption = pipelineOptions.find((option) => option.id === selected);
+  /** Find the global index of a File object inside the store's files array */
+  const getGlobalIndex = (file: File) => files.indexOf(file);
 
-          return (
-            <div key={ext} className="space-y-2">
-              {/* Extension group header */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-gunmetal bg-sandy/15 px-2 py-0.5 rounded-full uppercase tracking-wide">
-                  .{ext}
-                </span>
-                <span className="text-xs text-silver-dark">
-                  {groupFiles.length} file
-                  {groupFiles.length !== 1 ? "s" : ""}
-                </span>
+  return (
+    <div className="space-y-4">
+      {/* ── Clear all files button ──────────────────────── */}
+      {files.length > 1 && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setFiles([])}
+            className="inline-flex items-center gap-1.5 text-xs text-red-400 hover:text-red-600 font-medium transition-colors cursor-pointer"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+            </svg>
+            Clear all files
+          </button>
+        </div>
+      )}
+
+      {extKeys.map((ext) => {
+        const groupFiles = extGroups[ext];
+        const pipelines = extPipelines[ext] ?? [];
+        const selected = pipelinesByExt[ext] ?? "";
+        const pipelineOptions: ProviderOption[] = pipelines.map((pipelineId) => ({
+          id: pipelineId,
+          label: PIPELINE_LABELS[pipelineId] ?? pipelineId,
+          badge: PIPELINE_META[pipelineId]?.badge,
+          icon: PIPELINE_META[pipelineId]?.icon,
+          requiresApiKey: PIPELINE_NEEDS_KEY[pipelineId],
+        }));
+        const selectedOption = pipelineOptions.find((option) => option.id === selected);
+
+        const FILE_PREVIEW_LIMIT = 5;
+        const isExpanded = expandedExts.has(ext);
+        const visibleFiles = isExpanded ? groupFiles : groupFiles.slice(0, FILE_PREVIEW_LIMIT);
+        const hiddenCount = groupFiles.length - FILE_PREVIEW_LIMIT;
+        const showConfig = selected && HAS_CONFIG.has(selected);
+        const MAX_FILE_LIST_HEIGHT = 200; // px – scroll kicks in beyond this
+
+        return (
+          <div
+            key={ext}
+            className="rounded-xl border border-silver-light bg-card overflow-hidden"
+          >
+            {/* ── Group Header ──────────────────────────────── */}
+            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-gunmetal/[0.02] dark:bg-white/[0.02] border-b border-silver-light">
+              <div className="flex items-center gap-2.5">
+                {/* Extension icon */}
+                <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-sandy/10 text-sandy">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                  </svg>
+                </div>
+                <div>
+                  <span className="text-sm font-semibold text-gunmetal uppercase tracking-wide">.{ext}</span>
+                  <span className="text-xs text-silver-dark ml-2">
+                    {groupFiles.length} file{groupFiles.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
               </div>
 
-              {/* Pipeline options */}
-              <div className="space-y-2 ml-1">
+              <div className="flex items-center gap-2">
+                {/* Selected pipeline badge */}
+                {selected && selectedOption && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-sandy/10 text-sandy text-xs font-medium px-2.5 py-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-sandy" />
+                    {selectedOption.label}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="px-4 py-3 space-y-3">
+              {/* ── File list (scrollable) ────────────────────── */}
+              <div
+                className="space-y-0.5 overflow-y-auto pr-1"
+                style={{ maxHeight: isExpanded ? `${MAX_FILE_LIST_HEIGHT}px` : undefined }}
+              >
+                {visibleFiles.map((f, i) => {
+                  const globalIdx = getGlobalIndex(f);
+                  return (
+                    <div
+                      key={`${f.name}-${i}`}
+                      className="group flex items-center gap-2 text-xs text-gunmetal rounded-md px-1.5 py-1 hover:bg-gunmetal/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+                    >
+                      <svg className="h-3 w-3 text-silver-dark flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                      </svg>
+                      <span className="truncate font-mono">{f.name}</span>
+                      <span className="text-silver-dark whitespace-nowrap ml-auto">
+                        {f.size < 1024
+                          ? `${f.size} B`
+                          : f.size < 1048576
+                            ? `${(f.size / 1024).toFixed(1)} KB`
+                            : `${(f.size / 1048576).toFixed(1)} MB`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(globalIdx)}
+                        className="flex-shrink-0 rounded p-0.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all cursor-pointer"
+                        title={`Remove ${f.name}`}
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })}
+                {hiddenCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(ext)}
+                    className="text-xs text-sandy hover:text-sandy-dark font-medium cursor-pointer transition-colors mt-0.5 px-1.5"
+                  >
+                    {isExpanded ? "Show less" : `+${hiddenCount} more file${hiddenCount !== 1 ? "s" : ""}`}
+                  </button>
+                )}
+              </div>
+
+              {/* ── Pipeline selection ────────────────────────── */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-silver-dark">Select pipeline</p>
                 <ProviderSelector
                   options={pipelineOptions}
                   selectedId={selected}
@@ -223,9 +333,9 @@ export default function PipelineSelector() {
                 )}
               </div>
 
-              {/* Per-extension config form — appears below selected pipeline */}
-              {selected && selected !== PIPELINE.SIMPLE_TEXT && (
-                <ConfigContainer className="ml-1" active>
+              {/* ── Config form (only for pipelines that need it) ── */}
+              {showConfig && (
+                <ConfigContainer active>
                   <ConfigHeader
                     title={`${selectedOption?.label || "Pipeline"} Configuration`}
                     icon={selectedOption?.icon}
@@ -246,28 +356,18 @@ export default function PipelineSelector() {
                   )}
                   {(selected === PIPELINE.EXCEL_SPREADSHEET ||
                     selected === PIPELINE.CSV_SPREADSHEET) && (
-                    <ExcelForm ext={ext} />
+                    <div className="space-y-6">
+                      {groupFiles.map(file => (
+                        <ExcelForm key={file.name} ext={ext} file={file} />
+                      ))}
+                    </div>
                   )}
                 </ConfigContainer>
               )}
-              {selected === PIPELINE.SIMPLE_TEXT && (
-                <ConfigContainer className="ml-1" active>
-                  <ConfigHeader
-                    title={`${selectedOption?.label || "Pipeline"} Configuration`}
-                    icon={selectedOption?.icon}
-                    description=""
-                  />
-                </ConfigContainer>
-              )}
-
-              {/* Separator between groups */}
-              {multiGroup && ext !== extKeys[extKeys.length - 1] && (
-                <div className="h-px bg-silver-light mt-3" />
-              )}
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -187,6 +187,7 @@ export interface ExtPipelineConfig {
   excelSheet: string;
   excelSheets: string[];
   excelColumn: string;
+  excelSelectedColumns: string[];
   excelColumns: string[];
 }
 

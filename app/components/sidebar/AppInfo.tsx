@@ -7,70 +7,75 @@ import { useAppStore } from "@/app/lib/store";
 const STEPS = [
   {
     num: 1,
-    title: "Upload & Pipeline",
-    short: "Drop a file and pick a processing pipeline.",
-    detail: "Supports PDF, DOCX, TXT, Markdown, Excel, images, audio, and video. The pipeline is auto-selected when only one matches.",
-    badge: null,
+    title: "Upload Files",
+    short: "Drag & drop or browse for files and folders.",
+    detail: "Supports PDF, DOCX, TXT, Excel, CSV, images, audio, and video.",
   },
   {
     num: 2,
     title: "Configure & Parse",
-    short: "Set pipeline options, then process the document.",
-    detail: "For OpenRouter pipelines, enter your API key and choose a model. PDFs are parsed page-by-page via multimodal LLMs.",
-    badge: null,
+    short: "Select a pipeline and provider per file type.",
+    detail: "Local (Ollama, vLLM) or cloud (OpenRouter). Supports caching and cancellation.",
   },
   {
     num: 3,
     title: "Review Parsed Content",
-    short: "Inspect the parsed document.",
-    detail: "Verify the content extracted from your source files before chunking.",
-    badge: null,
+    short: "Verify and edit extracted content before chunking.",
+    detail: "Downloadable as plain text.",
   },
   {
     num: 4,
     title: "Chunking",
-    short: "Configure chunking and view chunks.",
-    detail: "Adjust parameters for the LangChain recursive text splitter and preview the resulting chunks.",
-    badge: null,
+    short: "Configure chunk size, overlap, and separators.",
+    detail: "Live preview updates automatically. Edit or delete individual chunks. Downloadable as JSON.",
   },
   {
     num: 5,
     title: "Embeddings",
-    short: "Generate vector embeddings with OpenRouter or Voyage AI.",
-    detail: "Chunks are batched and sent to your chosen embedding provider. Results can be downloaded as JSON.",
-    badge: null,
+    short: "Generate vector embeddings for each chunk.",
+    detail: "Providers: OpenRouter, Voyage AI, Cohere, Ollama, vLLM. Ensure index dimensions match the model.",
   },
   {
     num: 6,
     title: "Vector Databases",
-    short: "Upload embeddings to a vector database.",
-    detail: "Create or select an index, then upsert vectors with chunk text as metadata.",
-    badge: null,
+    short: "Configure and upsert to a vector database.",
+    detail: "Supports Pinecone, Chroma, MongoDB, and FAISS. Can customize field mapping before upsert.",
   },
 ];
 
-/* ─── Compute the current active step from store state ────── */
-function useActiveStep(): number {
+/* ─── Derive per-step completion state from the store ─────── */
+function useStepStates(): Record<number, { hasData: boolean; isComplete: boolean }> {
   const files = useAppStore((s) => s.files);
-  const pipelinesByExt = useAppStore((s) => s.pipelinesByExt);
+  const parsedResults = useAppStore((s) => s.parsedResults);
   const parsedContent = useAppStore((s) => s.parsedContent);
   const editedChunks = useAppStore((s) => s.editedChunks);
   const embeddingsData = useAppStore((s) => s.embeddingsData);
-  const scrollActiveStep = useAppStore((s) => s.scrollActiveStep);
+  const chunksHash = useAppStore((s) => s.chunksHash);
+  const embeddingsForChunksHash = useAppStore((s) => s.embeddingsForChunksHash);
+  const pineconeSuccess = useAppStore((s) => s.pineconeSuccess);
+  const chromaSuccess = useAppStore((s) => s.chromaSuccess);
 
-  // If scrolling is active and tracking a step, prioritize it
-  if (scrollActiveStep) return scrollActiveStep;
+  const allFilesParsed =
+    files.length > 0 &&
+    files.every((f) => parsedResults.some((r) => r.filename === f.name));
 
-  // Fallback logic based on data presence
-  if (embeddingsData && embeddingsData.length > 0) return 6;
-  if (editedChunks.length > 0) return 4;
-  if (parsedContent) return 3;
-  if (files.length > 0 && Object.values(pipelinesByExt).some(Boolean)) return 2;
-  return 1;
+  const hasEmbeddings = !!(embeddingsData && embeddingsData.length > 0);
+  const embeddingsFresh = hasEmbeddings && embeddingsForChunksHash === chunksHash;
+  const hasDbSuccess = !!(pineconeSuccess || chromaSuccess);
+
+  return {
+    1: { hasData: files.length > 0, isComplete: files.length > 0 },
+    2: { hasData: files.length > 0, isComplete: allFilesParsed },
+    3: { hasData: parsedContent !== null, isComplete: embeddingsFresh && allFilesParsed },
+    4: { hasData: editedChunks.length > 0, isComplete: embeddingsFresh && allFilesParsed },
+    5: { hasData: hasEmbeddings, isComplete: embeddingsFresh && allFilesParsed },
+    6: { hasData: hasDbSuccess, isComplete: hasDbSuccess && embeddingsFresh && allFilesParsed },
+  };
 }
 
 export default function AppInfo() {
-  const currentStep = useActiveStep();
+  const scrollActiveStep = useAppStore((s) => s.scrollActiveStep);
+  const stepStates = useStepStates();
 
   const scrollToStep = useCallback((stepNum: number) => {
     const el = document.getElementById(`step-${stepNum}`);
@@ -86,9 +91,8 @@ export default function AppInfo() {
       </h3>
 
       {STEPS.map((step) => {
-        const isActive = step.num === currentStep;
-        const isDone = step.num < currentStep;
-        const isFuture = step.num > currentStep;
+        const isActive = step.num === scrollActiveStep;
+        const { hasData, isComplete } = stepStates[step.num];
 
         return (
           <button
@@ -96,10 +100,7 @@ export default function AppInfo() {
             onClick={() => scrollToStep(step.num)}
             className={`
               w-full text-left rounded-lg px-3 py-2.5 transition-all duration-200 cursor-pointer
-              ${isActive ? "bg-sandy/10 border border-sandy/30" : "border border-transparent"}
-              ${isDone ? "opacity-70 hover:opacity-90" : ""}
-              ${isFuture ? "opacity-40 hover:opacity-60" : ""}
-              ${!isActive ? "hover:bg-silver-light/30" : ""}
+              ${isActive ? "bg-sandy/10 border border-sandy/30" : "border border-transparent hover:bg-silver-light/30"}
             `}
           >
             {/* Step header row */}
@@ -108,12 +109,12 @@ export default function AppInfo() {
               <div
                 className={`
                   flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors
-                  ${isActive ? "bg-sandy text-white" : ""}
-                  ${isDone ? "bg-sandy/60 text-white" : ""}
-                  ${isFuture ? "bg-silver-light text-silver-dark" : ""}
+                  ${isComplete ? "bg-sandy text-white" : ""}
+                  ${hasData && !isComplete ? "bg-sandy/50 text-white" : ""}
+                  ${!hasData ? "bg-silver-light text-silver-dark" : ""}
                 `}
               >
-                {isDone ? (
+                {isComplete ? (
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
@@ -128,13 +129,6 @@ export default function AppInfo() {
               >
                 {step.title}
               </span>
-
-              {/* API Key badge */}
-              {step.badge && (
-                <span className="ml-auto flex-shrink-0 rounded-md bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 leading-tight">
-                  {step.badge}
-                </span>
-              )}
             </div>
 
             {/* Active step shows contextual description */}

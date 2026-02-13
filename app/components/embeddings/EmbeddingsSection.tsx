@@ -568,7 +568,7 @@ export default function EmbeddingsSection() {
     <div className="bg-card rounded-xl shadow-sm border border-silver-light p-6 space-y-4">
       <h2 className="text-lg font-semibold text-gunmetal">
         <span className="inline-flex items-center justify-center h-6 px-2 min-w-[1.5rem] rounded-full bg-sandy text-white text-xs font-bold mr-2">
-          5 {embeddingDimensions > 0 && `· ${embeddingDimensions}d`}
+          5
         </span>
         Embeddings
       </h2>

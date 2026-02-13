@@ -2,25 +2,54 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useAppStore } from "@/app/lib/store";
+import type { ExtPipelineConfig } from "@/app/lib/types";
 
-export default function ExcelForm({ ext }: { ext: string }) {
+interface ExcelFormProps {
+  ext: string;
+  file?: File;
+}
+
+export default function ExcelForm({ ext, file: propFile }: ExcelFormProps) {
   const files = useAppStore((s) => s.files);
+  
+  // Use passed file or find first matching extension (legacy mode)
   const file = useMemo(
-    () => files.find(f => (f.name.split(".").pop()?.toLowerCase() ?? "") === ext) ?? null,
-    [files, ext],
+    () => propFile ?? files.find(f => (f.name.split(".").pop()?.toLowerCase() ?? "") === ext) ?? null,
+    [files, ext, propFile],
   );
-  const config = useAppStore((s) => s.configByExt[ext]);
+
+  const configByExt = useAppStore((s) => s.configByExt);
+  const configByFile = useAppStore((s) => s.configByFile);
+
+  // Determine effective config: prefer file-specific, fallback to extension-wide
+  const config = useMemo(() => {
+    if (file && configByFile[file.name]) {
+      return configByFile[file.name];
+    }
+    return configByExt[ext];
+  }, [file, configByFile, configByExt, ext]);
+
   const setConfigForExt = useAppStore((s) => s.setConfigForExt);
+  const setConfigForFile = useAppStore((s) => s.setConfigForFile);
+
+  // Helper to update config based on mode
+  const updateConfig = useCallback((update: Partial<ExtPipelineConfig>) => {
+    if (file) {
+      setConfigForFile(file.name, update);
+    } else {
+      setConfigForExt(ext, update);
+    }
+  }, [file, ext, setConfigForFile, setConfigForExt]);
 
   const excelSheet = config?.excelSheet ?? "";
   const excelSheets = config?.excelSheets ?? [];
-  const excelColumn = config?.excelColumn ?? "";
+  const excelSelectedColumns = config?.excelSelectedColumns ?? (config?.excelColumn ? [config.excelColumn] : []);
   const excelColumns = config?.excelColumns ?? [];
 
-  const setExcelSheet = useCallback((v: string) => setConfigForExt(ext, { excelSheet: v }), [ext, setConfigForExt]);
-  const setExcelSheets = useCallback((v: string[]) => setConfigForExt(ext, { excelSheets: v }), [ext, setConfigForExt]);
-  const setExcelColumn = useCallback((v: string) => setConfigForExt(ext, { excelColumn: v }), [ext, setConfigForExt]);
-  const setExcelColumns = useCallback((v: string[]) => setConfigForExt(ext, { excelColumns: v }), [ext, setConfigForExt]);
+  const setExcelSheet = useCallback((v: string) => updateConfig({ excelSheet: v }), [updateConfig]);
+  const setExcelSheets = useCallback((v: string[]) => updateConfig({ excelSheets: v }), [updateConfig]);
+  const setExcelSelectedColumns = useCallback((v: string[]) => updateConfig({ excelSelectedColumns: v }), [updateConfig]);
+  const setExcelColumns = useCallback((v: string[]) => updateConfig({ excelColumns: v }), [updateConfig]);
   
   const [loadingSheets, setLoadingSheets] = useState(false);
   const [loadingColumns, setLoadingColumns] = useState(false);
@@ -33,13 +62,21 @@ export default function ExcelForm({ ext }: { ext: string }) {
       try {
         const { getExcelSheets } = await import("@/app/lib/parsers");
         const sheets = await getExcelSheets(file);
+        
+        // Only update if sheets changed to avoid loops/resets
+        // We can compare lengths or content, but simpler to just set it.
+        // However, we must be careful not to overwrite user selection if sheets are same.
+        // For now, we just update the list.
         setExcelSheets(sheets);
         
-        // Auto-select if only 1 sheet
-        if (sheets.length === 1) {
+        // Auto-select logic:
+        // If current selection is invalid or empty, and we have sheets:
+        const currentSheet = config?.excelSheet;
+        if (sheets.length === 1 && currentSheet !== sheets[0]) {
           setExcelSheet(sheets[0]);
-        } else if (sheets.length > 0) {
-          setExcelSheet(""); // Force user to select
+        } else if (sheets.length > 0 && !sheets.includes(currentSheet || "")) {
+           // If current sheet is invalid, reset to empty
+           setExcelSheet("");
         }
       } catch (err) {
         console.error("Failed to read Excel sheets:", err);
@@ -49,7 +86,8 @@ export default function ExcelForm({ ext }: { ext: string }) {
       }
     }
     loadSheets();
-  }, [file, setExcelSheets, setExcelSheet]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file]); // Run when file changes. We intentionally omit setters to avoid loops.
 
   // 2. Load Columns when sheet changes
   useEffect(() => {
@@ -63,8 +101,17 @@ export default function ExcelForm({ ext }: { ext: string }) {
         const { getExcelColumns } = await import("@/app/lib/parsers");
         const cols = await getExcelColumns(file, excelSheet);
         setExcelColumns(cols);
-        if (cols.length > 0) setExcelColumn(cols[0]);
-        else setExcelColumn("");
+        
+        // Auto-select first column if nothing selected
+        const currentSelection = config?.excelSelectedColumns ?? [];
+        if (cols.length > 0) {
+           // Only default if empty selection or invalid selection
+           if (currentSelection.length === 0) {
+              setExcelSelectedColumns([cols[0]]);
+           }
+        } else {
+           setExcelSelectedColumns([]);
+        }
       } catch (err) {
         console.error("Failed to read columns:", err);
         setExcelColumns([]);
@@ -73,10 +120,25 @@ export default function ExcelForm({ ext }: { ext: string }) {
       }
     }
     loadColumns();
-  }, [file, excelSheet, setExcelColumns, setExcelColumn]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file, excelSheet]);
+
+  if (!file) {
+    return (
+      <div className="text-sm text-silver-dark italic">
+        No file selected.
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pt-2 border-t border-silver-light/50 mt-2">
+      <div className="flex items-center gap-2 mb-2">
+         <span className="text-xs font-mono bg-silver/10 px-1.5 py-0.5 rounded text-gunmetal">
+            {file.name}
+         </span>
+      </div>
+
       {/* Sheet Selector */}
       <div>
         <label className="block text-sm font-medium text-gunmetal mb-1">
@@ -112,7 +174,10 @@ export default function ExcelForm({ ext }: { ext: string }) {
       {/* Column Selector */}
       <div>
         <label className="block text-sm font-medium text-gunmetal mb-1">
-          Column to extract
+          Columns to extract
+          <span className="ml-2 text-xs text-silver-dark font-normal">
+            (Hold Ctrl/Cmd to select multiple)
+          </span>
           {loadingColumns && (
             <span className="ml-2 text-xs text-silver-dark animate-pulse">
               Reading columns…
@@ -120,10 +185,14 @@ export default function ExcelForm({ ext }: { ext: string }) {
           )}
         </label>
         <select
-          value={excelColumn}
-          onChange={(e) => setExcelColumn(e.target.value)}
+          multiple
+          value={excelSelectedColumns}
+          onChange={(e) => {
+            const selected = Array.from(e.target.selectedOptions, option => option.value);
+            setExcelSelectedColumns(selected);
+          }}
           disabled={!excelSheet || excelColumns.length === 0}
-          className="w-full rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none disabled:opacity-50"
+          className="w-full h-48 rounded-lg border border-silver px-3 py-2 text-sm bg-card focus:ring-2 focus:ring-sandy/50 focus:border-sandy outline-none appearance-none disabled:opacity-50"
         >
           {excelColumns.length === 0 && !loadingColumns ? (
             <option value="" disabled>
@@ -136,6 +205,9 @@ export default function ExcelForm({ ext }: { ext: string }) {
             </option>
           ))}
         </select>
+        <p className="mt-1 text-xs text-silver-dark">
+            Selected columns will be extracted row by row, maintaining the order of selection.
+        </p>
       </div>
     </div>
   );
