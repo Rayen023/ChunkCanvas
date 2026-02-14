@@ -7,6 +7,7 @@ import VllmStatus from "./VllmStatus";
 import OllamaStatus from "./OllamaStatus";
 import ChromaStatus from "./ChromaStatus";
 import FaissStatus from "./FaissStatus";
+import MongodbStatus from "./MongodbStatus";
 import DoclingStatus from "./DoclingStatus";
 import ThemeToggle from "./ThemeToggle";
 
@@ -19,9 +20,10 @@ function ResetButton() {
   const pineconeSuccess = useAppStore((s) => s.pineconeSuccess);
   const chromaSuccess = useAppStore((s) => s.chromaSuccess);
   const faissSuccess = useAppStore((s) => s.faissSuccess);
+  const mongodbSuccess = useAppStore((s) => s.mongodbSuccess);
   const [confirming, setConfirming] = useState(false);
 
-  const hasSuccess = !!(pineconeSuccess || chromaSuccess || faissSuccess);
+  const hasSuccess = !!(pineconeSuccess || chromaSuccess || faissSuccess || mongodbSuccess);
 
   const handleClick = () => {
     if (confirming) {
@@ -167,6 +169,10 @@ export default function Sidebar() {
           <div className="h-px bg-silver-light" />
 
           <ChromaStatus />
+
+          <div className="h-px bg-silver-light" />
+
+          <MongodbStatus />
 
           <div className="h-px bg-silver-light" />
 

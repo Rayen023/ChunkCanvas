@@ -174,6 +174,36 @@ export interface PineconeFieldMapping {
   filenameField: string;
 }
 
+// ─── MongoDB Field Mapping ────────────────────────────────────────────
+
+export interface MongodbIndexField {
+  type: "vector" | "filter" | string;
+  numDimensions?: number;
+  similarity?: string;
+  path: string;
+}
+
+export interface MongodbIndexDefinition {
+  fields: MongodbIndexField[];
+}
+
+export interface MongodbIndex {
+  name: string;
+  status: string;
+  latestDefinition?: MongodbIndexDefinition;
+}
+
+export interface MongodbFieldMapping {
+  database: string;
+  collection: string;
+  indexName: string;
+  vectorField: string;
+  textField: string;
+  metadataField: string;
+  dimensions: number;
+  similarity: "cosine" | "euclidean" | "dotProduct";
+}
+
 // ─── Per-Extension Pipeline Config ─────────────────────────────────────
 
 export interface ExtPipelineConfig {

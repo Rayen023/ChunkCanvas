@@ -5,7 +5,7 @@
  */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ChunkingParams, EmbeddingProvider, PdfEngine, ParsedFileResult, PineconeFieldMapping, ExtPipelineConfig, ChromaMode, FaissDbMode, FaissMetric, VectorDbProvider } from "./types";
+import type { ChunkingParams, EmbeddingProvider, PdfEngine, ParsedFileResult, PineconeFieldMapping, MongodbFieldMapping, ExtPipelineConfig, ChromaMode, FaissDbMode, FaissMetric, VectorDbProvider } from "./types";
 import { DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP, DEFAULT_SEPARATORS, DEFAULT_OLLAMA_ENDPOINT, DEFAULT_EMBEDDING_DIMENSIONS, DEFAULT_VLLM_ENDPOINT, DEFAULT_VLLM_EMBEDDING_ENDPOINT, DEFAULT_DOCLING_ENDPOINT, DEFAULT_CHROMA_ENDPOINT, DEFAULT_FAISS_ENDPOINT } from "./constants";
 
 function fnv1a32(input: string): string {
@@ -145,6 +145,16 @@ export interface AppState {
   faissSuccess: string | null;
   selectedVectorDb: VectorDbProvider;
 
+  // ── Step 7 — MongoDB ──────────────────────────
+  mongodbUri: string;
+  mongodbDatabases: string[];
+  mongodbCollections: string[];
+  mongodbIndexes: import("./types").MongodbIndex[];
+  mongodbFieldMapping: MongodbFieldMapping;
+  isUploadingMongodb: boolean;
+  mongodbError: string | null;
+  mongodbSuccess: string | null;
+
   // ── UI state ───────────────────────────────────
   allChunksCollapsed: boolean;
 
@@ -159,6 +169,7 @@ export interface AppState {
     voyage: string;
     cohere: string;
     pinecone: string;
+    mongodb: string;
   };
   // ── Persisted user preferences (survive page reloads) ─────
   /** Last-used pipeline per file extension (e.g. "mp4" → "vLLM — Video...") */
@@ -280,6 +291,15 @@ export interface AppActions {
   setFaissError: (err: string | null) => void;
   setFaissSuccess: (msg: string | null) => void;
   setSelectedVectorDb: (provider: VectorDbProvider) => void;
+
+  setMongodbUri: (uri: string) => void;
+  setMongodbDatabases: (dbs: string[]) => void;
+  setMongodbCollections: (colls: string[]) => void;
+  setMongodbIndexes: (idxs: import("./types").MongodbIndex[]) => void;
+  setMongodbFieldMapping: (mapping: Partial<MongodbFieldMapping>) => void;
+  setIsUploadingMongodb: (v: boolean) => void;
+  setMongodbError: (err: string | null) => void;
+  setMongodbSuccess: (msg: string | null) => void;
 
   // Sidebar
   setSidebarCollapsed: (v: boolean) => void;
@@ -432,11 +452,28 @@ export const useAppStore = create<AppState & AppActions>()(
   faissError: null,
   faissSuccess: null,
   selectedVectorDb: "pinecone",
+  mongodbUri: "",
+  mongodbDatabases: [],
+  mongodbCollections: [],
+  mongodbIndexes: [],
+  mongodbFieldMapping: {
+    database: "chunkcanvas",
+    collection: "chunks",
+    indexName: "vector_index",
+    vectorField: "embedding",
+    textField: "text",
+    metadataField: "metadata",
+    dimensions: DEFAULT_EMBEDDING_DIMENSIONS,
+    similarity: "cosine",
+  },
+  isUploadingMongodb: false,
+  mongodbError: null,
+  mongodbSuccess: null,
   allChunksCollapsed: true,
   sidebarCollapsed: false,
   sidebarWidth: 288,
   scrollActiveStep: null,
-  envKeys: { openrouter: "", voyage: "", cohere: "", pinecone: "" },
+  envKeys: { openrouter: "", voyage: "", cohere: "", pinecone: "", mongodb: "" },
 
   // Persisted user preferences (initial empty — hydrated from localStorage)
   lastPipelineByExt: {},
@@ -489,6 +526,8 @@ export const useAppStore = create<AppState & AppActions>()(
         chromaError: null,
         faissSuccess: null,
         faissError: null,
+        mongodbSuccess: null,
+        mongodbError: null,
       });
       return;
     }
@@ -551,6 +590,8 @@ export const useAppStore = create<AppState & AppActions>()(
         chromaError: null,
         faissSuccess: null,
         faissError: null,
+        mongodbSuccess: null,
+        mongodbError: null,
       });
       return;
     }
@@ -662,6 +703,7 @@ export const useAppStore = create<AppState & AppActions>()(
       pineconeSuccess: null,
       chromaSuccess: null,
       faissSuccess: null,
+      mongodbSuccess: null,
     });
   },
   setPipeline: (pipeline) => {
@@ -911,6 +953,18 @@ export const useAppStore = create<AppState & AppActions>()(
   setFaissSuccess: (msg) => set({ faissSuccess: msg }),
   setSelectedVectorDb: (provider) => set({ selectedVectorDb: provider }),
 
+  setMongodbUri: (uri) => set({ mongodbUri: uri }),
+  setMongodbDatabases: (dbs) => set({ mongodbDatabases: dbs }),
+  setMongodbCollections: (colls) => set({ mongodbCollections: colls }),
+  setMongodbIndexes: (idxs) => set({ mongodbIndexes: idxs }),
+  setMongodbFieldMapping: (mapping) =>
+    set((s) => ({
+      mongodbFieldMapping: { ...s.mongodbFieldMapping, ...mapping },
+    })),
+  setIsUploadingMongodb: (v) => set({ isUploadingMongodb: v }),
+  setMongodbError: (err) => set({ mongodbError: err }),
+  setMongodbSuccess: (msg) => set({ mongodbSuccess: msg }),
+
   setAllChunksCollapsed: (v) => set({ allChunksCollapsed: v }),
 
   setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
@@ -1027,6 +1081,23 @@ export const useAppStore = create<AppState & AppActions>()(
       isUploadingFaiss: false,
       faissError: null,
       faissSuccess: null,
+      mongodbUri: s.envKeys.mongodb || s.mongodbUri || "",
+      mongodbDatabases: [],
+      mongodbCollections: [],
+      mongodbIndexes: [],
+      mongodbFieldMapping: s.mongodbFieldMapping || {
+        database: "chunkcanvas",
+        collection: "chunks",
+        indexName: "vector_index",
+        vectorField: "embedding",
+        textField: "text",
+        metadataField: "metadata",
+        dimensions: DEFAULT_EMBEDDING_DIMENSIONS,
+        similarity: "cosine",
+      },
+      isUploadingMongodb: false,
+      mongodbError: null,
+      mongodbSuccess: null,
       allChunksCollapsed: true,
       scrollActiveStep: null,
       sidebarWidth: 288,
@@ -1067,6 +1138,8 @@ export const useAppStore = create<AppState & AppActions>()(
       resets.chromaError = null;
       resets.faissSuccess = null;
       resets.faissError = null;
+      resets.mongodbSuccess = null;
+      resets.mongodbError = null;
     }
     set(resets);
   },
@@ -1145,6 +1218,9 @@ export const useAppStore = create<AppState & AppActions>()(
         faissMetric: state.faissMetric,
         selectedVectorDb: state.selectedVectorDb,
 
+        // MongoDB settings
+        mongodbFieldMapping: state.mongodbFieldMapping,
+
         // Chunking settings
         chunkingParams: state.chunkingParams,
 
@@ -1198,8 +1274,15 @@ export const useAppStore = create<AppState & AppActions>()(
           isUploadingChroma: false,
           chromaError: null,
           chromaSuccess: null,
+          mongodbUri: "",
+          mongodbDatabases: [],
+          mongodbCollections: [],
+          mongodbIndexes: [],
+          isUploadingMongodb: false,
+          mongodbError: null,
+          mongodbSuccess: null,
           scrollActiveStep: null,
-          envKeys: { openrouter: "", voyage: "", cohere: "", pinecone: "" },
+          envKeys: { openrouter: "", voyage: "", cohere: "", pinecone: "", mongodb: "" },
         };
       },
     },

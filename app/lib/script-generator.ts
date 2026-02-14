@@ -10,7 +10,7 @@ import type { ChunkingParams, EmbeddingProvider, PdfEngine } from "./types";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
-export type ScriptStage = "parsing" | "chunks" | "embeddings" | "pinecone";
+export type ScriptStage = "parsing" | "chunks" | "embeddings" | "pinecone" | "mongodb";
 
 export interface ScriptConfig {
   pipeline: string;
@@ -37,6 +37,12 @@ export interface ScriptConfig {
   pineconeIndexName?: string;
   pineconeCloud?: string;
   pineconeRegion?: string;
+  // MongoDB (for mongodb stage)
+  mongodbDatabase?: string;
+  mongodbCollection?: string;
+  mongodbIndexName?: string;
+  mongodbVectorField?: string;
+  mongodbTextField?: string;
 }
 
 // ─── Dependency Sets ──────────────────────────────────────────────────────
@@ -70,7 +76,7 @@ function getDeps(pipeline: string, stage: ScriptStage, embeddingProvider?: Embed
       break;
   }
 
-  if (stage === "embeddings" || stage === "pinecone") {
+  if (stage === "embeddings" || stage === "pinecone" || stage === "mongodb") {
     if (embeddingProvider === "openrouter") {
       base.push('"httpx>=0.27"');
     } else if (embeddingProvider === "cohere") {
@@ -82,6 +88,9 @@ function getDeps(pipeline: string, stage: ScriptStage, embeddingProvider?: Embed
   }
   if (stage === "pinecone") {
     base.push('"langchain-pinecone>=0.1.4"', '"pinecone>=5.0"', '"langchain-core>=0.2"');
+  }
+  if (stage === "mongodb") {
+    base.push('"pymongo[srv]>=4.6"', '"langchain-mongodb>=0.1"');
   }
 
   return base;
@@ -627,6 +636,129 @@ if __name__ == "__main__":
 `;
 }
 
+function genMainMongodb(
+  embeddingProvider: EmbeddingProvider,
+  voyageModel: string,
+  cohereModel: string,
+  openrouterEmbeddingModel: string,
+  dbName: string,
+  collName: string,
+  indexName: string,
+  vectorField: string,
+  textField: string,
+  isExcel: boolean,
+  embeddingDimensions?: number,
+  defaultFilename?: string
+): string {
+  const sourceFile = defaultFilename ? JSON.stringify(defaultFilename) : '""';
+  const chunkCall = isExcel
+    ? `    rows = read_document(file_path)\n    chunks = chunk_rows(rows, filename)`
+    : `    text = read_document(file_path)\n    chunks = chunk_text(text, filename)`;
+
+  const dimsPayload = embeddingDimensions && embeddingDimensions > 0
+    ? `\n    DIMENSIONS = ${embeddingDimensions}`
+    : "";
+  const dimsJson = embeddingDimensions && embeddingDimensions > 0
+    ? `, "dimensions": DIMENSIONS`
+    : "";
+
+  let embedSection = "";
+  if (embeddingProvider === "openrouter") {
+    embedSection = `    import httpx
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    emb_model = ${JSON.stringify(openrouterEmbeddingModel)}
+    BATCH_SIZE = 128${dimsPayload}
+    all_embeddings = []
+    for i in range(0, len(chunks), BATCH_SIZE):
+        batch = chunks[i:i+BATCH_SIZE]
+        resp = httpx.post(
+            "https://openrouter.ai/api/v1/embeddings",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+                     "HTTP-Referer": "https://github.com/chunkcanvas", "X-Title": "ChunkCanvas"},
+            json={"model": emb_model, "input": batch${dimsJson}},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = sorted(resp.json()["data"], key=lambda x: x.get("index", 0))
+        all_embeddings.extend([d["embedding"] for d in data])
+        print(f"  Embedding batch {i//BATCH_SIZE + 1} done ({len(all_embeddings)}/{len(chunks)})")
+
+    from pymongo import MongoClient
+    client = MongoClient(os.environ["MONGODB_URI"])
+    db = client[${JSON.stringify(dbName)}]
+    coll = db[${JSON.stringify(collName)}]
+
+    docs = [{"${textField}": t, "${vectorField}": e, "metadata": {"filename": filename}}
+            for t, e in zip(chunks, all_embeddings)]
+    coll.insert_many(docs)
+    print(f"Uploaded {len(docs)} chunks to MongoDB collection: {${JSON.stringify(collName)}}")`;
+  } else if (embeddingProvider === "cohere") {
+    embedSection = `    from langchain_cohere import CohereEmbeddings
+    from langchain_mongodb import MongoDBAtlasVectorSearch
+    from pymongo import MongoClient
+
+    embedder = CohereEmbeddings(model=${JSON.stringify(cohereModel)})
+    client = MongoClient(os.environ["MONGODB_URI"])
+    coll = client[${JSON.stringify(dbName)}][${JSON.stringify(collName)}]
+
+    vectorstore = MongoDBAtlasVectorSearch.from_texts(
+        texts=chunks,
+        embedding=embedder,
+        collection=coll,
+        index_name=${JSON.stringify(indexName)},
+        text_key=${JSON.stringify(textField)},
+        embedding_key=${JSON.stringify(vectorField)},
+    )
+    print(f"Uploaded {len(chunks)} chunks to MongoDB.")`;
+  } else {
+    embedSection = `    from langchain_voyageai import VoyageAIEmbeddings
+    from langchain_mongodb import MongoDBAtlasVectorSearch
+    from pymongo import MongoClient
+
+    embedder = VoyageAIEmbeddings(model=${JSON.stringify(voyageModel)})
+    client = MongoClient(os.environ["MONGODB_URI"])
+    coll = client[${JSON.stringify(dbName)}][${JSON.stringify(collName)}]
+
+    vectorstore = MongoDBAtlasVectorSearch.from_texts(
+        texts=chunks,
+        embedding=embedder,
+        collection=coll,
+        index_name=${JSON.stringify(indexName)},
+        text_key=${JSON.stringify(textField)},
+        embedding_key=${JSON.stringify(vectorField)},
+    )
+    print(f"Uploaded {len(chunks)} chunks to MongoDB.")`;
+  }
+
+  return `
+import os
+
+# Configuration
+SOURCE_FILE = ${sourceFile}
+
+def main():
+    if not SOURCE_FILE:
+        print("Error: SOURCE_FILE is not configured. Please set the SOURCE_FILE variable in this script.")
+        return
+    if not os.path.exists(SOURCE_FILE):
+        print(f"Error: File '{SOURCE_FILE}' not found.")
+        return
+
+    file_path = SOURCE_FILE
+    filename = os.path.basename(file_path)
+    print(f"Processing {filename}...")
+
+${chunkCall}
+
+${embedSection}
+
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    main()
+`;
+}
+
 // ─── pyproject.toml Generator ─────────────────────────────────────────────
 
 function genPyproject(deps: string[], stage: string): string {
@@ -664,6 +796,9 @@ function genEnvExample(pipeline: string, stage: ScriptStage, embeddingProvider?:
   }
   if (stage === "pinecone") {
     lines.push("PINECONE_API_KEY=");
+  }
+  if (stage === "mongodb") {
+    lines.push("MONGODB_URI=");
   }
   return lines.join("\n") + "\n";
 }
@@ -759,6 +894,22 @@ export function generatePipelineScript(
         config.pineconeIndexName ?? "chunkcanvas",
         config.pineconeCloud ?? "aws",
         config.pineconeRegion ?? "us-east-1",
+        isSpreadsheet,
+        config.embeddingDimensions,
+        filename,
+      );
+      break;
+    case "mongodb":
+      mainFn = genMainMongodb(
+        embeddingProvider,
+        config.voyageModel ?? "voyage-4",
+        config.cohereModel ?? "embed-english-v3.0",
+        config.openrouterEmbeddingModel ?? "qwen/qwen3-embedding-8b",
+        config.mongodbDatabase ?? "chunkcanvas",
+        config.mongodbCollection ?? "chunks",
+        config.mongodbIndexName ?? "vector_index",
+        config.mongodbVectorField ?? "embedding",
+        config.mongodbTextField ?? "text",
         isSpreadsheet,
         config.embeddingDimensions,
         filename,

@@ -55,6 +55,7 @@ function useStepStates(): Record<number, { hasData: boolean; isComplete: boolean
   const pineconeSuccess = useAppStore((s) => s.pineconeSuccess);
   const chromaSuccess = useAppStore((s) => s.chromaSuccess);
   const faissSuccess = useAppStore((s) => s.faissSuccess);
+  const mongodbSuccess = useAppStore((s) => s.mongodbSuccess);
 
   const allFilesParsed =
     files.length > 0 &&
@@ -62,7 +63,7 @@ function useStepStates(): Record<number, { hasData: boolean; isComplete: boolean
 
   const hasEmbeddings = !!(embeddingsData && embeddingsData.length > 0);
   const embeddingsFresh = hasEmbeddings && embeddingsForChunksHash === chunksHash;
-  const hasDbSuccess = !!(pineconeSuccess || chromaSuccess || faissSuccess);
+  const hasDbSuccess = !!(pineconeSuccess || chromaSuccess || faissSuccess || mongodbSuccess);
 
   return {
     1: { hasData: files.length > 0, isComplete: files.length > 0 },

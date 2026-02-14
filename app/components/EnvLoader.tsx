@@ -16,6 +16,7 @@ export default function EnvLoader() {
   const setChromaApiKey = useAppStore((s) => s.setChromaApiKey);
   const setChromaTenant = useAppStore((s) => s.setChromaTenant);
   const setChromaDatabase = useAppStore((s) => s.setChromaDatabase);
+  const setMongodbUri = useAppStore((s) => s.setMongodbUri);
 
   useEffect(() => {
     const or = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY ?? "";
@@ -25,8 +26,9 @@ export default function EnvLoader() {
     const ck = process.env.NEXT_PUBLIC_CHROMA_API_KEY ?? "";
     const ct = process.env.NEXT_PUBLIC_CHROMA_TENANT ?? "";
     const cd = process.env.NEXT_PUBLIC_CHROMA_DATABASE ?? "";
+    const mu = process.env.NEXT_PUBLIC_MONGODB_URI ?? "";
 
-    setEnvKeys({ openrouter: or, voyage: va, cohere: co, pinecone: pc });
+    setEnvKeys({ openrouter: or, voyage: va, cohere: co, pinecone: pc, mongodb: mu });
 
     // Pre-fill if not already set
     if (or) setOpenrouterApiKey(or);
@@ -36,6 +38,7 @@ export default function EnvLoader() {
     if (ck) setChromaApiKey(ck);
     if (ct) setChromaTenant(ct);
     if (cd) setChromaDatabase(cd);
+    if (mu) setMongodbUri(mu);
   }, [
     setEnvKeys,
     setOpenrouterApiKey,
@@ -45,6 +48,7 @@ export default function EnvLoader() {
     setChromaApiKey,
     setChromaTenant,
     setChromaDatabase,
+    setMongodbUri,
   ]);
 
   return null;

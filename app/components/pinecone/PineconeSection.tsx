@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { useAppStore } from "@/app/lib/store";
 import { PINECONE_ENVIRONMENTS, PIPELINE } from "@/app/lib/constants";
@@ -9,6 +8,7 @@ import { ProviderSelector, ConfigContainer, ConfigHeader, ProviderOption } from 
 import StatusMessage from "@/app/components/shared/StatusMessage";
 import Tooltip from "@/app/components/shared/Tooltip";
 import FaissSection from "@/app/components/faiss/FaissSection";
+import MongodbSection from "@/app/components/mongodb/MongodbSection";
 import type { ScriptConfig } from "@/app/lib/script-generator";
 import type { VectorDbProvider } from "@/app/lib/types";
 
@@ -1315,17 +1315,7 @@ export default function PineconeSection() {
       )}
 
       {selectedDb === "mongodb" && (
-        <div className="py-12 flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
-          <div className="h-16 w-16 bg-sandy/10 rounded-2xl flex items-center justify-center">
-            <Image src="/tech-icons/MongoDB.svg" alt="MongoDB" width={40} height={40} className="h-10 w-10 opacity-50 grayscale" />
-          </div>
-          <div className="space-y-2 max-w-sm">
-            <h3 className="text-gunmetal font-semibold text-lg">MongoDB Atlas Vector Search</h3>
-            <p className="text-silver-dark text-sm">
-              Native support for MongoDB Atlas Vector Search is on our roadmap. Stay tuned for updates!
-            </p>
-          </div>
-        </div>
+        <MongodbSection />
       )}
 
       {selectedDb === "faiss" && (
