@@ -4,9 +4,7 @@
   <a href="https://chunkcanvas.cc"><strong>🌐 ChunkCanvas.cc</strong></a> is a document-processing GUI designed for RAG workflows. It allows you to parse PDFs, process images, transcribe audio/video, and extract data from Excel/CSV files using either local engines (Ollama, vLLM, Docling) or cloud providers (OpenRouter). From there, you can chunk content with configurable LangChain's RecursiveCharacterTextSplitter, edit parsed text and chunks directly in the UI, generate embeddings with your preferred provider, and ingest (text, embeddings and metadata) into the selected vector database of choice.
 </p>
 
-<p align="center">
-  <video src="docs/demo.mp4" autoplay loop muted playsinline width="50%"></video>
-</p>
+[demo.webm](https://github.com/user-attachments/assets/b0fd2071-111e-450a-b3df-8d3740e152ee)
 
 ## Document Support
 
