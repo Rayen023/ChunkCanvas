@@ -9,7 +9,8 @@ services:
     ports:
       - "7432:7432"
     env_file:
-      - .env.local
+      - path: .env.local
+        required: false
     environment:
       - NEXT_PUBLIC_OLLAMA_URL=http://localhost:11434
       - NEXT_PUBLIC_VLLM_URL=http://localhost:8000
@@ -34,7 +35,8 @@ services:
     volumes:
       - ./backend/data:/app/data
     env_file:
-      - .env.local
+      - path: .env.local
+        required: false
     restart: unless-stopped
 
   docling:
@@ -46,7 +48,8 @@ services:
     ports:
       - "8020:8020"
     env_file:
-      - .env.local
+      - path: .env.local
+        required: false
     restart: unless-stopped
 
   chroma:
