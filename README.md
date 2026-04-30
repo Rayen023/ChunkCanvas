@@ -62,7 +62,7 @@ docker compose up -d
 
 | Service         | URL                        |
 | --------------- | -------------------------- |
-| Frontend        | http://localhost:3000      |
+| Frontend        | http://localhost:7432      |
 | Docling Backend | http://localhost:8020/docs |
 | FAISS Backend   | http://localhost:8010/docs |
 | Chroma Database | http://localhost:8030      |
