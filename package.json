@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --turbopack -p 7432",
     "build": "next build --turbopack",
-    "start": "next start",
+    "start": "next start -p 7432",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "update-models": "npx tsx scripts/update-models.ts"
   },

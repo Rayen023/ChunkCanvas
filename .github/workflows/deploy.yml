@@ -27,8 +27,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Type check
+        run: npm run typecheck
+
       - name: Run lint
         run: npm run lint
+
+      - name: Check for circular imports
+        run: npx madge --circular --extensions ts,tsx app/
+
+      - name: Update models data
+        run: npm run update-models
 
       - name: Run build
         run: npm run build
