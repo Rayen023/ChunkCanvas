@@ -211,11 +211,14 @@ export default function OpenRouterForm({ ext }: { ext: string }) {
 
       {/* Model Selector */}
       <div>
-        <label className="block text-sm font-medium text-gunmetal mb-1">
+        <label className="flex items-center gap-2 text-sm font-medium text-gunmetal mb-1">
           Model
+          <span className="text-xs font-normal text-silver-dark">
+            {({ file: "PDF", image: "image", audio: "audio", video: "video" } as Record<string, string>)[modality] ?? modality} input only
+          </span>
           {loadingModels && (
-            <span className="ml-2 text-xs text-silver-dark animate-pulse">
-              Loading models…
+            <span className="text-xs text-silver-dark animate-pulse">
+              Loading…
             </span>
           )}
         </label>

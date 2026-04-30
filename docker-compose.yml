@@ -2,6 +2,7 @@ name: chunkcanvas
 
 services:
   chunkcanvas-web:
+    image: rayengh01/chunkcanvas-web:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -25,6 +26,7 @@ services:
       - chroma
 
   faiss:
+    image: rayengh01/chunkcanvas-backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -40,6 +42,7 @@ services:
     restart: unless-stopped
 
   docling:
+    image: rayengh01/chunkcanvas-backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
